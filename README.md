@@ -1,4 +1,4 @@
-# typedown
+# Typedown
 
 A fast, local-first Markdown editor that renders **while you type** (Typora-style),
 with Bear-style inline tags, full-text search, and a vault-based document manager.

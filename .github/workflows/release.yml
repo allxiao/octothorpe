@@ -63,7 +63,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: "typedown ${{ github.ref_name }}"
+          releaseName: "Typedown ${{ github.ref_name }}"
           releaseBody: "Download the installer for your platform from the assets below."
           releaseDraft: true
           prerelease: false

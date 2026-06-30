@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "typedown",
+  "productName": "Typedown",
   "version": "0.1.0",
   "identifier": "com.typedown.app",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "typedown",
+        "title": "Typedown",
         "width": 1100,
         "height": 720
       }
@@ -32,7 +32,7 @@
     "category": "Productivity",
     "copyright": "Copyright © 2026 Menghua Xiao",
     "shortDescription": "A Typora-like Markdown editor with document management",
-    "longDescription": "typedown is a fast, local-first Markdown editor that renders while you type (Typora-style), with Bear-style inline tags, full-text search (including Chinese), and a vault-based document manager.",
+    "longDescription": "Typedown is a fast, local-first Markdown editor that renders while you type (Typora-style), with Bear-style inline tags, full-text search (including Chinese), and a vault-based document manager.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
