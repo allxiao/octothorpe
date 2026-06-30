@@ -1,0 +1,25 @@
+# Dependencies
+node_modules
+
+# Build output
+/dist
+
+# Editor / OS
+.DS_Store
+*.local
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Vite
+vite.config.*.timestamp-*
+
+# SQLite index (lives in app data dir, never committed)
+*.sqlite
+*.sqlite-*
+*.db
+
+# Claude Code local settings
+.claude/settings.local.json

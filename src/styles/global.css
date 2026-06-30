@@ -1,0 +1,38 @@
+:root {
+  --border: #e2e2e6;
+  --toolbar-bg: #fafafa;
+  --button-bg: #ffffff;
+  --button-hover-bg: #f0f0f0;
+  --editor-font: ui-monospace, "SF Mono", "Cascadia Code", "Fira Code", Menlo,
+    Consolas, monospace;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --border: #2c2c30;
+    --toolbar-bg: #1c1c1f;
+    --button-bg: #242428;
+    --button-hover-bg: #2e2e33;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg, Canvas);
+  color: var(--fg, CanvasText);
+}
+
+#app {
+  height: 100%;
+}
