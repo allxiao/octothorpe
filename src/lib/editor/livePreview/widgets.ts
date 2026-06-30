@@ -1,22 +1,40 @@
 import { WidgetType, type EditorView } from "@codemirror/view";
 
-/** Renders an inline image in place of `![alt](url)`. */
+/**
+ * Renders an inline image. Clicking it selects the alt text and places the
+ * caret just before `]` (Typora-style), which reveals the source for editing.
+ */
 export class ImageWidget extends WidgetType {
   constructor(
-    readonly url: string,
+    readonly src: string,
     readonly alt: string,
+    readonly altFrom: number,
+    readonly altTo: number,
   ) {
     super();
   }
   eq(other: ImageWidget) {
-    return other.url === this.url && other.alt === this.alt;
+    return (
+      other.src === this.src &&
+      other.alt === this.alt &&
+      other.altFrom === this.altFrom &&
+      other.altTo === this.altTo
+    );
   }
-  toDOM() {
+  toDOM(view: EditorView) {
     const img = document.createElement("img");
-    img.src = this.url;
+    img.src = this.src;
     img.alt = this.alt;
     img.className = "cm-md-image";
+    img.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      view.dispatch({ selection: { anchor: this.altFrom, head: this.altTo } });
+      view.focus();
+    });
     return img;
+  }
+  ignoreEvent() {
+    return true;
   }
 }
 

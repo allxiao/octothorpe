@@ -1,8 +1,29 @@
 import { Decoration, type DecorationSet, type EditorView } from "@codemirror/view";
 import { syntaxTree } from "@codemirror/language";
 import { type Range } from "@codemirror/state";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import { isElementActive, isLineActive } from "./reveal";
+import { imageBaseDir } from "./config";
 import { ImageWidget, HrWidget, BulletWidget, CheckboxWidget } from "./widgets";
+
+/**
+ * Resolve a Markdown image URL to something the webview can load. Remote and
+ * data URLs pass through; relative/local paths are resolved against the open
+ * document's directory and routed through Tauri's asset protocol. Returns null
+ * when it can't be resolved (e.g. a local path outside a Tauri context).
+ */
+function resolveImageSrc(url: string, baseDir: string): string | null {
+  if (/^(https?:|data:)/.test(url)) return url;
+  try {
+    if (/^file:/i.test(url)) return convertFileSrc(decodeURI(url.replace(/^file:\/*/i, "")));
+    if (!baseDir) return null;
+    const sep = baseDir.includes("\\") ? "\\" : "/";
+    const joined = baseDir.replace(/[\\/]+$/, "") + sep + url.replace(/\//g, sep);
+    return convertFileSrc(joined);
+  } catch {
+    return null;
+  }
+}
 
 export interface BuiltDecorations {
   /** All decorations: marker hiding, inline styling, line classes, widgets. */
@@ -46,6 +67,7 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
   };
 
   const slice = (from: number, to: number) => state.doc.sliceString(from, to);
+  const baseDir = state.facet(imageBaseDir);
 
   for (const { from, to } of view.visibleRanges) {
     syntaxTree(state).iterate({
@@ -112,13 +134,33 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
           return;
         }
 
-        // --- Images: replace the whole node with an <img> ---
+        // --- Images: render a preview; keep the source editable while active ---
         if (name === "Image") {
-          if (!isElementActive(state, node.from, node.to)) {
-            const raw = slice(node.from, node.to);
-            const m = /^!\[([^\]]*)\]\(([^)\s]+)[^)]*\)$/.exec(raw);
-            if (m && /^(https?:|data:)/.test(m[2])) {
-              replaceWith(node.from, node.to, new ImageWidget(m[2], m[1]));
+          const raw = slice(node.from, node.to);
+          const m = /^!\[([^\]]*)\]\(([^)\s]+)[^)]*\)$/.exec(raw);
+          if (m) {
+            const src = resolveImageSrc(m[2], baseDir);
+            if (src) {
+              const alt = m[1];
+              const altFrom = node.from + 2;
+              const altTo = altFrom + alt.length;
+              if (isElementActive(state, node.from, node.to)) {
+                // Editing: leave the raw markdown visible, show a preview after it.
+                decos.push(
+                  Decoration.widget({
+                    widget: new ImageWidget(src, alt, altFrom, altTo),
+                    side: 1,
+                  }).range(node.to),
+                );
+              } else {
+                // Rendered: replace the source with the image. Intentionally NOT
+                // atomic, so a click (or arrowing in) can reach the source to edit.
+                decos.push(
+                  Decoration.replace({
+                    widget: new ImageWidget(src, alt, altFrom, altTo),
+                  }).range(node.from, node.to),
+                );
+              }
             }
           }
           return;

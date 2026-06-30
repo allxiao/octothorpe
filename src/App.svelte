@@ -9,6 +9,9 @@
   let dirty = $state(false);
   let status = $state("");
 
+  // Folder of the open document, used to resolve relative image paths.
+  let baseDir = $derived(currentPath ? currentPath.replace(/[\\/][^\\/]*$/, "") : "");
+
   async function handleOpen() {
     try {
       const result = await openMarkdownFile();
@@ -50,7 +53,7 @@
     <span class="status">{status}</span>
   </header>
   <main class="editor-pane">
-    <EditorHost {content} onchange={handleChange} onsave={handleSave} />
+    <EditorHost {content} {baseDir} onchange={handleChange} onsave={handleSave} />
   </main>
 </div>
 

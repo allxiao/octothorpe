@@ -1,27 +1,32 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
   import { EditorView } from "@codemirror/view";
-  import { EditorState } from "@codemirror/state";
+  import { EditorState, Compartment } from "@codemirror/state";
   import { baseExtensions } from "./setup";
+  import { imageBaseDir } from "./livePreview/config";
 
   let {
     content = "",
+    baseDir = "",
     onchange,
     onsave,
   }: {
     content: string;
+    baseDir?: string;
     onchange?: (value: string) => void;
     onsave?: () => void;
   } = $props();
 
   let host: HTMLDivElement;
   let view: EditorView | undefined;
+  const baseDirComp = new Compartment();
 
   onMount(() => {
     const state = EditorState.create({
       doc: content,
       extensions: [
         ...baseExtensions(() => onsave?.()),
+        baseDirComp.of(imageBaseDir.of(baseDir)),
         EditorView.updateListener.of((u) => {
           if (u.docChanged) {
             onchange?.(u.state.doc.toString());
@@ -48,6 +53,14 @@
       view.dispatch({
         changes: { from: 0, to: view.state.doc.length, insert: incoming },
       });
+    }
+  });
+
+  // Keep the image base directory in sync with the open document's folder.
+  $effect(() => {
+    const dir = baseDir;
+    if (view) {
+      view.dispatch({ effects: baseDirComp.reconfigure(imageBaseDir.of(dir)) });
     }
   });
 </script>
