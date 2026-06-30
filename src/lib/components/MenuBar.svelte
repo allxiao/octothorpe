@@ -264,6 +264,7 @@
     font: inherit;
     font-size: 13px;
     text-align: left;
+    white-space: nowrap;
     padding: 5px 10px;
     border-radius: 4px;
     cursor: pointer;
