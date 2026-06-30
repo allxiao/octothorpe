@@ -32,6 +32,16 @@ pub struct DocumentContent {
     pub content: String,
 }
 
+/// Result of opening an arbitrary path: `rel_path` is set when the file lives
+/// inside the open vault (so it can be treated as a normal vault doc); `None`
+/// means it is edited standalone (outside the vault).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenedDoc {
+    pub rel_path: Option<String>,
+    pub content: String,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TreeNode {

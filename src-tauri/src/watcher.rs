@@ -124,6 +124,86 @@ fn process(app: &AppHandle, paths: BTreeSet<PathBuf>) {
     }
 }
 
+/// Start (or restart) watching a single standalone (out-of-vault) file. The
+/// file's parent directory is watched non-recursively and events are filtered
+/// to the target name, which survives our atomic temp-file+rename writes (a
+/// direct file watch would break when the inode is replaced).
+pub fn start_file(app: &AppHandle, path: PathBuf) {
+    let parent = match path.parent() {
+        Some(p) => p.to_path_buf(),
+        None => return,
+    };
+    let target = path.clone();
+    let handle = app.clone();
+    let debouncer = new_debouncer(
+        Duration::from_millis(DEBOUNCE_MS),
+        None,
+        move |result: DebounceEventResult| {
+            if let Ok(events) = result {
+                let hit = events
+                    .iter()
+                    .any(|e| e.paths.iter().any(|p| same_file(p, &target)));
+                if hit {
+                    process_file(&handle, &target);
+                }
+            }
+        },
+    );
+
+    let mut debouncer = match debouncer {
+        Ok(d) => d,
+        Err(_) => return,
+    };
+    if debouncer
+        .watcher()
+        .watch(parent.as_path(), RecursiveMode::NonRecursive)
+        .is_err()
+    {
+        return;
+    }
+    debouncer.cache().add_root(parent.as_path(), RecursiveMode::NonRecursive);
+
+    *app.state::<AppState>().file_watcher.lock().unwrap() = Some(Box::new(debouncer));
+}
+
+/// Stop watching the standalone file (drops the debouncer).
+pub fn stop_file(app: &AppHandle) {
+    *app.state::<AppState>().file_watcher.lock().unwrap() = None;
+}
+
+/// Emit a `file://changed` event for a standalone file, suppressing the app's
+/// own writes (keyed by absolute path in the shared `suppress` map).
+fn process_file(app: &AppHandle, target: &Path) {
+    let state = app.state::<AppState>();
+    let key = target.to_string_lossy().to_string();
+    let removed = !target.exists();
+
+    if !removed {
+        let m = mtime_secs(target);
+        let mut sup = state.suppress.lock().unwrap();
+        if sup.get(&key).copied() == Some(m) {
+            sup.remove(&key);
+            return;
+        }
+    }
+
+    let _ = app.emit(
+        "file://changed",
+        serde_json::json!({ "path": key, "removed": removed }),
+    );
+}
+
+/// Whether a filesystem event path refers to our watched target file.
+fn same_file(p: &Path, target: &Path) -> bool {
+    if p == target {
+        return true;
+    }
+    match (p.file_name(), target.file_name(), p.parent(), target.parent()) {
+        (Some(a), Some(b), Some(pp), Some(tp)) => a == b && pp == tp,
+        _ => false,
+    }
+}
+
 fn is_markdown(path: &Path) -> bool {
     matches!(
         path.extension().and_then(|e| e.to_str()).map(str::to_ascii_lowercase).as_deref(),

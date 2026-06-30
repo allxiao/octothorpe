@@ -11,11 +11,15 @@ use crate::core::vault::Vault;
 pub struct AppState {
     pub db: Mutex<Option<Connection>>,
     pub vault: Mutex<Option<Vault>>,
-    /// rel_path -> mtime(secs) of the app's own recent writes, so the file
-    /// watcher can ignore the events they trigger (self-write suppression).
+    /// rel_path (vault docs) or absolute path (standalone files) -> mtime(secs)
+    /// of the app's own recent writes, so the file watchers can ignore the
+    /// events they trigger (self-write suppression).
     pub suppress: Mutex<HashMap<String, i64>>,
-    /// Keeps the active filesystem watcher alive; replacing it stops the old one.
+    /// Keeps the active vault watcher alive; replacing it stops the old one.
     pub watcher: Mutex<Option<Box<dyn std::any::Any + Send>>>,
+    /// Keeps the watcher for a standalone (out-of-vault) file alive; replacing
+    /// it stops the old one.
+    pub file_watcher: Mutex<Option<Box<dyn std::any::Any + Send>>>,
 }
 
 impl AppState {
@@ -25,6 +29,7 @@ impl AppState {
             vault: Mutex::new(None),
             suppress: Mutex::new(HashMap::new()),
             watcher: Mutex::new(None),
+            file_watcher: Mutex::new(None),
         }
     }
 }

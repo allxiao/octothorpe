@@ -14,7 +14,11 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::documents::read_file,
             commands::documents::write_file,
+            commands::documents::delete_file,
+            commands::documents::watch_file,
+            commands::documents::unwatch_file,
             commands::vault::open_vault,
+            commands::vault::open_path,
             commands::vault::get_tree,
             commands::vault::get_tag_tree,
             commands::vault::list_documents,

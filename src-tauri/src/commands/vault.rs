@@ -8,7 +8,9 @@ use std::path::{Path, PathBuf};
 use tauri::{AppHandle, State};
 
 use crate::core::index::{db, query, scan};
-use crate::core::model::{DocumentContent, DocumentMeta, SearchHit, TagNode, TreeNode, VaultInfo};
+use crate::core::model::{
+    DocumentContent, DocumentMeta, OpenedDoc, SearchHit, TagNode, TreeNode, VaultInfo,
+};
 use crate::core::storage::document;
 use crate::core::vault::Vault;
 use crate::error::{AppError, AppResult};
@@ -100,6 +102,23 @@ pub fn read_document(rel_path: String, state: State<AppState>) -> AppResult<Docu
     let vault = guard.as_ref().ok_or_else(no_vault)?;
     let content = document::read_document(&vault.abs_path(&rel_path))?;
     Ok(DocumentContent { rel_path, content })
+}
+
+/// Open an arbitrary file by absolute path. If a vault is open and the file
+/// lives inside it, returns its vault-relative id so the frontend treats it as
+/// a normal indexed doc; otherwise `rel_path` is `None` (edited standalone).
+#[tauri::command]
+pub fn open_path(path: String, state: State<AppState>) -> AppResult<OpenedDoc> {
+    let p = PathBuf::from(&path);
+    let content = document::read_document(&p)?;
+    let rel_path = {
+        let guard = state.vault.lock().unwrap();
+        guard
+            .as_ref()
+            .and_then(|v| v.rel_path(&p))
+            .filter(|r| !r.is_empty())
+    };
+    Ok(OpenedDoc { rel_path, content })
 }
 
 #[tauri::command]
