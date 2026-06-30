@@ -2,6 +2,7 @@ mod commands;
 mod core;
 mod error;
 mod state;
+mod watcher;
 
 use state::AppState;
 

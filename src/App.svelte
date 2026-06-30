@@ -1,10 +1,16 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import { workspace } from "./lib/stores/workspace.svelte";
   import MenuBar from "./lib/components/MenuBar.svelte";
   import ActivityBar from "./lib/components/ActivityBar.svelte";
   import Sidebar from "./lib/components/Sidebar.svelte";
   import StatusBar from "./lib/components/StatusBar.svelte";
   import EditorHost from "./lib/editor/EditorHost.svelte";
+
+  onMount(() => {
+    void workspace.listenForChanges();
+    void workspace.restoreLastVault();
+  });
 
   function handleSave() {
     void workspace.save();
@@ -33,14 +39,27 @@
     <Sidebar />
     <div class="editor-area">
       {#if workspace.activeRelPath}
-        <EditorHost
-          content={workspace.content}
-          baseDir={workspace.baseDir}
-          onchange={(v) => workspace.setContent(v)}
-          onsave={handleSave}
-          ontagclick={(tag) => workspace.selectTag(tag)}
-          onready={(api) => workspace.registerEditor(api)}
-        />
+        <main class="editor-pane">
+          {#if workspace.externalChanged}
+            <div class="ext-banner">
+              <span>This note changed on disk while you have unsaved edits.</span>
+              <span class="actions">
+                <button onclick={() => workspace.openDoc(workspace.activeRelPath!)}>
+                  Reload from disk
+                </button>
+                <button onclick={() => (workspace.externalChanged = false)}>Keep mine</button>
+              </span>
+            </div>
+          {/if}
+          <EditorHost
+            content={workspace.content}
+            baseDir={workspace.baseDir}
+            onchange={(v) => workspace.setContent(v)}
+            onsave={handleSave}
+            ontagclick={(tag) => workspace.selectTag(tag)}
+            onready={(api) => workspace.registerEditor(api)}
+          />
+        </main>
       {:else}
         <div class="empty">
           {#if workspace.root}
@@ -71,6 +90,40 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
+  }
+  .editor-pane {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .ext-banner {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 12px;
+    font-size: 13px;
+    background: #fde68a;
+    color: #4a3a00;
+  }
+  .ext-banner .actions {
+    display: flex;
+    gap: 6px;
+  }
+  .ext-banner button {
+    font: inherit;
+    font-size: 12px;
+    padding: 3px 10px;
+    border: 1px solid rgba(0, 0, 0, 0.25);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.6);
+    color: inherit;
+    cursor: pointer;
+  }
+  .ext-banner button:hover {
+    background: rgba(255, 255, 255, 0.9);
   }
   .empty {
     flex: 1 1 auto;

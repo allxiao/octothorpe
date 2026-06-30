@@ -37,6 +37,9 @@ class Workspace {
   searchQuery = $state<string>("");
   searchResults = $state<SearchHit[]>([]);
 
+  /** Set when the open note changed on disk while it had unsaved edits. */
+  externalChanged = $state(false);
+
   #editor: EditorApi | null = null;
 
   /** Display title for the active document (basename without extension). */
@@ -91,6 +94,29 @@ class Workspace {
     this.clearTagFilter();
     await this.refresh();
     this.status = "";
+    try {
+      localStorage.setItem("typedown:lastVault", path);
+    } catch {
+      // ignore (private mode, etc.)
+    }
+  }
+
+  /** Reopen the most recently used vault on startup (Tauri only). */
+  async restoreLastVault() {
+    if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) return;
+    let path: string | null = null;
+    try {
+      path = localStorage.getItem("typedown:lastVault");
+    } catch {
+      return;
+    }
+    if (path) {
+      try {
+        await this.loadVault(path);
+      } catch {
+        // vault moved/removed — ignore and start empty
+      }
+    }
   }
 
   async refresh() {
@@ -112,6 +138,7 @@ class Workspace {
       this.activeRelPath = relPath;
       this.content = doc.content;
       this.dirty = false;
+      this.externalChanged = false;
     } catch (e) {
       this.status = `Open failed: ${e}`;
     }
@@ -127,6 +154,7 @@ class Workspace {
     try {
       await ipc.writeDocument(this.activeRelPath, this.content);
       this.dirty = false;
+      this.externalChanged = false;
       this.status = "Saved";
       await this.refresh();
     } catch (e) {
@@ -173,6 +201,40 @@ class Workspace {
       this.searchResults = await ipc.search(q);
     } catch (e) {
       this.status = `Search failed: ${e}`;
+    }
+  }
+
+  // --- external changes (file watcher) -------------------------------------
+
+  /** Subscribe to the backend's vault://changed events. Safe no-op in a plain
+   *  browser (no Tauri). */
+  async listenForChanges() {
+    if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) return;
+    const { listen } = await import("@tauri-apps/api/event");
+    await listen<{ updated?: string[]; removed?: string[] }>("vault://changed", (e) => {
+      this.onVaultChanged(e.payload);
+    });
+  }
+
+  onVaultChanged(payload: { updated?: string[]; removed?: string[] }) {
+    const updated = payload?.updated ?? [];
+    const removed = payload?.removed ?? [];
+    void this.refresh();
+
+    const active = this.activeRelPath;
+    if (!active) return;
+    if (removed.includes(active)) {
+      this.activeRelPath = null;
+      this.content = "";
+      this.status = "Note deleted on disk";
+    } else if (updated.includes(active)) {
+      if (this.dirty) {
+        this.externalChanged = true;
+        this.status = "Changed on disk — your unsaved edits are kept";
+      } else {
+        void this.openDoc(active); // silent reload
+        this.status = "Reloaded (changed on disk)";
+      }
     }
   }
 }

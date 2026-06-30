@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Mutex;
 
 use rusqlite::Connection;
@@ -10,6 +11,11 @@ use crate::core::vault::Vault;
 pub struct AppState {
     pub db: Mutex<Option<Connection>>,
     pub vault: Mutex<Option<Vault>>,
+    /// rel_path -> mtime(secs) of the app's own recent writes, so the file
+    /// watcher can ignore the events they trigger (self-write suppression).
+    pub suppress: Mutex<HashMap<String, i64>>,
+    /// Keeps the active filesystem watcher alive; replacing it stops the old one.
+    pub watcher: Mutex<Option<Box<dyn std::any::Any + Send>>>,
 }
 
 impl AppState {
@@ -17,6 +23,8 @@ impl AppState {
         Self {
             db: Mutex::new(None),
             vault: Mutex::new(None),
+            suppress: Mutex::new(HashMap::new()),
+            watcher: Mutex::new(None),
         }
     }
 }

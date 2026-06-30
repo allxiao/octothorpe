@@ -73,6 +73,29 @@ pub fn remove_one(conn: &mut Connection, rel: &str) -> AppResult<()> {
     Ok(())
 }
 
+/// Remove a deleted path from the index. Handles both a single document and a
+/// whole directory subtree (used by the filesystem watcher, where we can't tell
+/// which it was after deletion).
+pub fn remove_path(conn: &mut Connection, rel: &str) -> AppResult<()> {
+    let tx = conn.transaction()?;
+    let like = format!("{rel}/%");
+    {
+        let mut stmt =
+            tx.prepare("SELECT id FROM documents WHERE rel_path = ?1 OR rel_path LIKE ?2")?;
+        let ids: Vec<i64> = stmt
+            .query_map(params![rel, like], |r| r.get(0))?
+            .collect::<Result<_, _>>()?;
+        for id in ids {
+            tx.execute("DELETE FROM documents_fts WHERE rowid = ?1", params![id])?;
+        }
+    }
+    tx.execute("DELETE FROM documents WHERE rel_path = ?1 OR rel_path LIKE ?2", params![rel, like])?;
+    tx.execute("DELETE FROM folders WHERE rel_path = ?1 OR rel_path LIKE ?2", params![rel, like])?;
+    prune_tags(&tx)?;
+    tx.commit()?;
+    Ok(())
+}
+
 fn index_file(tx: &Transaction, vault: &Vault, rel: &str) -> AppResult<()> {
     let abs = vault.abs_path(rel);
     let meta = fs::metadata(&abs)?;

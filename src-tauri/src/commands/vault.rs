@@ -3,9 +3,9 @@
 //! is scoped to the vault. Write paths lock the vault (outer) then the db (inner)
 //! to keep a consistent lock order.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-use tauri::State;
+use tauri::{AppHandle, State};
 
 use crate::core::index::{db, query, scan};
 use crate::core::model::{DocumentContent, DocumentMeta, SearchHit, TagNode, TreeNode, VaultInfo};
@@ -18,8 +18,20 @@ fn no_vault() -> AppError {
     AppError::Other("no vault is open".into())
 }
 
+/// Record the mtime of a file the app just wrote, so the watcher ignores the
+/// event it triggers (self-write suppression).
+fn record_write(state: &AppState, rel: &str, abs: &Path) {
+    if let Some(secs) = std::fs::metadata(abs)
+        .and_then(|m| m.modified())
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+    {
+        state.suppress.lock().unwrap().insert(rel.to_string(), secs.as_secs() as i64);
+    }
+}
+
 #[tauri::command]
-pub fn open_vault(path: String, state: State<AppState>) -> AppResult<VaultInfo> {
+pub fn open_vault(path: String, app: AppHandle, state: State<AppState>) -> AppResult<VaultInfo> {
     let root = PathBuf::from(&path);
 
     // Vault-scoped index under <vault>/.typedown/ (a dot-dir, so it's skipped by
@@ -38,6 +50,10 @@ pub fn open_vault(path: String, state: State<AppState>) -> AppResult<VaultInfo> 
 
     *state.db.lock().unwrap() = Some(conn);
     *state.vault.lock().unwrap() = Some(vault);
+    state.suppress.lock().unwrap().clear();
+
+    // Watch the vault for external changes.
+    crate::watcher::start(&app);
     Ok(info)
 }
 
@@ -94,7 +110,9 @@ pub fn write_document(
 ) -> AppResult<DocumentMeta> {
     let vguard = state.vault.lock().unwrap();
     let vault = vguard.as_ref().ok_or_else(no_vault)?;
-    document::write_document(&vault.abs_path(&rel_path), &content)?;
+    let abs = vault.abs_path(&rel_path);
+    document::write_document(&abs, &content)?;
+    record_write(&state, &rel_path, &abs);
 
     let mut dguard = state.db.lock().unwrap();
     let db = dguard.as_mut().ok_or_else(no_vault)?;
@@ -118,7 +136,9 @@ pub fn create_document(
         rel = join_rel(&folder, &format!("{stem}-{n}.md"));
         n += 1;
     }
-    document::write_document(&vault.abs_path(&rel), &format!("# {title}\n\n"))?;
+    let abs = vault.abs_path(&rel);
+    document::write_document(&abs, &format!("# {title}\n\n"))?;
+    record_write(&state, &rel, &abs);
 
     let mut dguard = state.db.lock().unwrap();
     let db = dguard.as_mut().ok_or_else(no_vault)?;
