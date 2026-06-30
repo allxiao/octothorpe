@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
   import { EditorView } from "@codemirror/view";
-  import { EditorState, Compartment } from "@codemirror/state";
+  import { EditorState, Compartment, Annotation } from "@codemirror/state";
   import { baseExtensions } from "./setup";
   import { imageBaseDir, onTagClick } from "./livePreview/config";
 
@@ -24,6 +24,9 @@
   let host: HTMLDivElement;
   let view: EditorView | undefined;
   const baseDirComp = new Compartment();
+  // Marks a programmatic document reset (opening a file / new buffer) so it
+  // isn't reported as a user edit.
+  const External = Annotation.define<boolean>();
 
   function gotoLine(line: number) {
     if (!view) return;
@@ -43,7 +46,7 @@
         baseDirComp.of(imageBaseDir.of(baseDir)),
         onTagClick.of((tag) => ontagclick?.(tag)),
         EditorView.updateListener.of((u) => {
-          if (u.docChanged) {
+          if (u.docChanged && !u.transactions.some((t) => t.annotation(External))) {
             onchange?.(u.state.doc.toString());
           }
         }),
@@ -64,13 +67,14 @@
   });
 
   // Reset the document only when `content` changes externally (e.g. a file is
-  // opened). Echoes from the user's own typing match the current doc, so this
-  // is a no-op for them and avoids a feedback loop.
+  // opened). The External annotation keeps this from being reported as a user
+  // edit; echoes from the user's own typing already match the doc (no-op).
   $effect(() => {
     const incoming = content;
     if (view && incoming !== view.state.doc.toString()) {
       view.dispatch({
         changes: { from: 0, to: view.state.doc.length, insert: incoming },
+        annotations: External.of(true),
       });
     }
   });

@@ -91,8 +91,8 @@ export async function pickMarkdownPath(): Promise<string | null> {
 }
 
 /** Prompt for a destination path to save to. Returns null if cancelled. */
-export async function pickSavePath(defaultName: string): Promise<string | null> {
-  const chosen = await save({ filters: MD_FILTERS, defaultPath: defaultName });
+export async function pickSavePath(defaultPath: string): Promise<string | null> {
+  const chosen = await save({ filters: MD_FILTERS, defaultPath });
   return chosen ?? null;
 }
 

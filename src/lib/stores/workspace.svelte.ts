@@ -254,7 +254,16 @@ class Workspace {
   async saveAs() {
     if (!this.hasDoc) return;
     try {
-      const target = await ipc.pickSavePath(`${this.activeTitle || "Untitled"}.md`);
+      const name = `${this.activeTitle || "Untitled"}.md`;
+      let defaultPath = name;
+      if (this.activeAbsPath) {
+        defaultPath = this.activeAbsPath; // existing file: start where it lives
+      } else if (this.root) {
+        // New untitled buffer with a folder open: default into that folder.
+        const sep = this.root.includes("\\") ? "\\" : "/";
+        defaultPath = this.root + sep + name;
+      }
+      const target = await ipc.pickSavePath(defaultPath);
       if (!target) return;
       await ipc.writeFile(target, this.content);
       const doc = await ipc.openPath(target);
@@ -318,13 +327,12 @@ class Workspace {
     this.externalChanged = false;
   }
 
-  /** New document. Dispatches by state: a vault note when a folder is open; an
-   *  untitled buffer when none is open and nothing is being edited; otherwise a
-   *  new window (so the current edit isn't lost). */
+  /** New document. Opens a blank untitled buffer — its filename is chosen on the
+   *  first Save (no file is written to disk until then). When no folder is open
+   *  and a document is already being edited, opens a new window instead so the
+   *  current buffer isn't replaced. */
   newFile() {
-    if (this.root) {
-      void this.newNote();
-    } else if (!this.hasDoc) {
+    if (this.root || !this.hasDoc) {
       this.openUntitled();
     } else {
       void ipc.newWindow(true);
