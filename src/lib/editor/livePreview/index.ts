@@ -7,6 +7,7 @@ import {
 } from "@codemirror/view";
 import type { Extension } from "@codemirror/state";
 import { buildDecorations } from "./build";
+import { onTagClick } from "./config";
 
 /**
  * Live-preview ViewPlugin. Rebuilds decorations on document, viewport, or
@@ -80,9 +81,30 @@ const livePreviewTheme = EditorView.theme({
   },
   ".cm-md-bullet": { color: "#888" },
   ".cm-md-task": { marginRight: "0.4em", verticalAlign: "middle", cursor: "pointer" },
+  ".cm-md-tag": {
+    color: "var(--accent, #3b82f6)",
+    background: "rgba(59, 130, 246, 0.12)",
+    borderRadius: "5px",
+    padding: "0.05em 0.35em",
+    cursor: "pointer",
+  },
+});
+
+// Clicking a tag pill notifies the host (e.g. to filter the sidebar), without
+// stealing the click — the caret still lands where you clicked.
+const tagClickHandler = EditorView.domEventHandlers({
+  mousedown(event, view) {
+    const target = event.target as HTMLElement | null;
+    const pill = target?.closest?.(".cm-md-tag");
+    const tag = pill?.getAttribute("data-tag");
+    if (tag) {
+      view.state.facet(onTagClick)?.(tag);
+    }
+    return false;
+  },
 });
 
 /** The full live-preview extension bundle. */
 export function livePreview(): Extension {
-  return [livePreviewPlugin, livePreviewTheme];
+  return [livePreviewPlugin, livePreviewTheme, tagClickHandler];
 }

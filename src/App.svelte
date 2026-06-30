@@ -29,6 +29,7 @@
           baseDir={workspace.baseDir}
           onchange={(v) => workspace.setContent(v)}
           onsave={handleSave}
+          ontagclick={(tag) => workspace.selectTag(tag)}
         />
       </main>
     {:else}

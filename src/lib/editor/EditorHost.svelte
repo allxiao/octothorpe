@@ -3,18 +3,20 @@
   import { EditorView } from "@codemirror/view";
   import { EditorState, Compartment } from "@codemirror/state";
   import { baseExtensions } from "./setup";
-  import { imageBaseDir } from "./livePreview/config";
+  import { imageBaseDir, onTagClick } from "./livePreview/config";
 
   let {
     content = "",
     baseDir = "",
     onchange,
     onsave,
+    ontagclick,
   }: {
     content: string;
     baseDir?: string;
     onchange?: (value: string) => void;
     onsave?: () => void;
+    ontagclick?: (tag: string) => void;
   } = $props();
 
   let host: HTMLDivElement;
@@ -27,6 +29,7 @@
       extensions: [
         ...baseExtensions(() => onsave?.()),
         baseDirComp.of(imageBaseDir.of(baseDir)),
+        onTagClick.of((tag) => ontagclick?.(tag)),
         EditorView.updateListener.of((u) => {
           if (u.docChanged) {
             onchange?.(u.state.doc.toString());

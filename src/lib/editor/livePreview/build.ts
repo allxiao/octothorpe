@@ -4,6 +4,7 @@ import { type Range } from "@codemirror/state";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { isElementActive, isLineActive } from "./reveal";
 import { imageBaseDir } from "./config";
+import { scanTagsInLine } from "./tagScan";
 import { ImageWidget, HrWidget, BulletWidget, CheckboxWidget } from "./widgets";
 
 /**
@@ -227,6 +228,22 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
         }
       },
     });
+
+    // Bear-style tag pills: a viewport-only plain-text scan (the Lezer parser
+    // doesn't model tags). Mark each `#tag` with a clickable pill class.
+    let ln = state.doc.lineAt(from).number;
+    const lastLn = state.doc.lineAt(to).number;
+    for (; ln <= lastLn; ln++) {
+      const line = state.doc.line(ln);
+      for (const t of scanTagsInLine(line.text)) {
+        decos.push(
+          Decoration.mark({
+            class: "cm-md-tag",
+            attributes: { "data-tag": t.path },
+          }).range(line.from + t.start, line.from + t.end),
+        );
+      }
+    }
   }
 
   // `true` sorts the ranges (by from, then startSide) as RangeSet requires.

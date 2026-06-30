@@ -100,7 +100,11 @@ class Workspace {
 
   async selectTag(path: string) {
     this.filterTag = path;
-    this.filteredDocs = await ipc.documentsByTag(path);
+    try {
+      this.filteredDocs = await ipc.documentsByTag(path);
+    } catch (e) {
+      this.status = `Tag filter failed: ${e}`;
+    }
   }
 
   clearTagFilter() {
@@ -110,3 +114,8 @@ class Workspace {
 }
 
 export const workspace = new Workspace();
+
+// Dev-only hook so the workspace can be driven in a browser without Tauri.
+if (import.meta.env.DEV) {
+  (globalThis as unknown as { __workspace?: Workspace }).__workspace = workspace;
+}
