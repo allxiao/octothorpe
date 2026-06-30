@@ -76,6 +76,12 @@ export interface StartupOptions {
 }
 export const startupOptions = () => invoke<StartupOptions>("startup_options");
 
+/** Close the current window (and, since each window is its own process, exit it). */
+export async function closeWindow(): Promise<void> {
+  const { getCurrentWebviewWindow } = await import("@tauri-apps/api/webviewWindow");
+  await getCurrentWebviewWindow().close();
+}
+
 // --- Dialogs --------------------------------------------------------------
 
 /** Prompt for a markdown file to open. Returns its path, or null if cancelled. */

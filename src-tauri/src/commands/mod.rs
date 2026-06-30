@@ -2,4 +2,5 @@
 //! maps errors. No business logic lives here.
 
 pub mod documents;
+pub mod system;
 pub mod vault;

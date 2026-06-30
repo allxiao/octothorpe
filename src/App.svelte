@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { workspace } from "./lib/stores/workspace.svelte";
+  import * as ipc from "./lib/ipc/commands";
   import MenuBar from "./lib/components/MenuBar.svelte";
   import ActivityBar from "./lib/components/ActivityBar.svelte";
   import Sidebar from "./lib/components/Sidebar.svelte";
@@ -9,8 +10,27 @@
 
   onMount(() => {
     void workspace.listenForChanges();
-    void workspace.restoreLastVault();
+    void initStartup();
   });
+
+  // New Window launches a fresh process; those skip restoring the last folder
+  // (and may open straight onto an empty buffer). The main process restores.
+  async function initStartup() {
+    if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) {
+      void workspace.restoreLastVault();
+      return;
+    }
+    try {
+      const opts = await ipc.startupOptions();
+      if (opts.blank) {
+        if (opts.untitled) workspace.openUntitled();
+      } else {
+        await workspace.restoreLastVault();
+      }
+    } catch {
+      void workspace.restoreLastVault();
+    }
+  }
 
   function handleSave() {
     void workspace.save();
