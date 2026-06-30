@@ -11,17 +11,29 @@
     onchange,
     onsave,
     ontagclick,
+    onready,
   }: {
     content: string;
     baseDir?: string;
     onchange?: (value: string) => void;
     onsave?: () => void;
     ontagclick?: (tag: string) => void;
+    onready?: (api: { gotoLine: (line: number) => void } | null) => void;
   } = $props();
 
   let host: HTMLDivElement;
   let view: EditorView | undefined;
   const baseDirComp = new Compartment();
+
+  function gotoLine(line: number) {
+    if (!view) return;
+    const target = view.state.doc.line(Math.max(1, Math.min(line, view.state.doc.lines)));
+    view.dispatch({
+      selection: { anchor: target.from },
+      effects: EditorView.scrollIntoView(target.from, { y: "start" }),
+    });
+    view.focus();
+  }
 
   onMount(() => {
     const state = EditorState.create({
@@ -39,13 +51,17 @@
     });
     view = new EditorView({ state, parent: host });
     view.focus();
+    onready?.({ gotoLine });
     // Dev-only hook so the live preview can be driven/inspected in a browser.
     if (import.meta.env.DEV) {
       (window as unknown as { __cmView?: EditorView }).__cmView = view;
     }
   });
 
-  onDestroy(() => view?.destroy());
+  onDestroy(() => {
+    onready?.(null);
+    view?.destroy();
+  });
 
   // Reset the document only when `content` changes externally (e.g. a file is
   // opened). Echoes from the user's own typing match the current doc, so this

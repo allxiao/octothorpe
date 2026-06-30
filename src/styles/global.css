@@ -1,8 +1,12 @@
 :root {
   --border: #e2e2e6;
   --toolbar-bg: #fafafa;
+  --sidebar-bg: #f3f3f3;
+  --activitybar-bg: #2c2c32;
+  --activitybar-fg: #ffffff;
+  --menu-bg: #ffffff;
   --button-bg: #ffffff;
-  --button-hover-bg: #f0f0f0;
+  --button-hover-bg: #ececef;
   --accent: #3b82f6;
   --accent-soft: rgba(59, 130, 246, 0.15);
   --editor-font: ui-monospace, "SF Mono", "Cascadia Code", "Fira Code", Menlo,
@@ -14,6 +18,9 @@
   :root {
     --border: #2c2c30;
     --toolbar-bg: #1c1c1f;
+    --sidebar-bg: #19191c;
+    --activitybar-bg: #19191c;
+    --menu-bg: #242428;
     --button-bg: #242428;
     --button-hover-bg: #2e2e33;
     --accent-soft: rgba(59, 130, 246, 0.25);

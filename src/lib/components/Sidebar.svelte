@@ -1,48 +1,59 @@
 <script lang="ts">
   import { workspace } from "../stores/workspace.svelte";
+  import Panel from "./Panel.svelte";
   import FileTree from "./FileTree.svelte";
   import TagTree from "./TagTree.svelte";
+  import Outline from "./Outline.svelte";
+
+  const titles = { explorer: "Explorer", tags: "Tags", outline: "Outline" } as const;
+
+  let notes = $derived(workspace.filterTag ? workspace.filteredDocs : workspace.allDocs);
+  let notesTitle = $derived(workspace.filterTag ? `#${workspace.filterTag}` : "All Notes");
 </script>
 
 <aside class="sidebar">
-  <div class="actions">
-    <button onclick={() => workspace.openVault()}>Open Vault</button>
-    <button onclick={() => workspace.newNote()} disabled={!workspace.root}>New Note</button>
-  </div>
+  <div class="view-header">{titles[workspace.activeView]}</div>
 
-  {#if workspace.root}
-    {#if workspace.filterTag}
-      <div class="section-title">
-        <span>#{workspace.filterTag}</span>
-        <button class="clear" onclick={() => workspace.clearTagFilter()}>✕</button>
-      </div>
-      <div class="doc-list">
-        {#each workspace.filteredDocs as doc (doc.id)}
-          <div
-            class="doc"
+  {#if !workspace.root}
+    <div class="hint">No vault open. Use <strong>File ▸ Open Vault</strong>.</div>
+  {:else if workspace.activeView === "explorer"}
+    <Panel title="Files">
+      <FileTree nodes={workspace.tree} />
+    </Panel>
+    <Panel title="Outline" collapsed>
+      <Outline />
+    </Panel>
+  {:else if workspace.activeView === "tags"}
+    <Panel title="Tags">
+      {#if workspace.tags.length}
+        <TagTree nodes={workspace.tags} />
+      {:else}
+        <div class="hint">No tags yet — add <code>#tags</code> to your notes.</div>
+      {/if}
+    </Panel>
+    <Panel title={notesTitle}>
+      {#if workspace.filterTag}
+        <button class="clear" onclick={() => workspace.clearTagFilter()}>✕ clear filter</button>
+      {/if}
+      <div class="notes">
+        {#each notes as doc (doc.id)}
+          <button
+            class="note"
             class:active={workspace.activeRelPath === doc.relPath}
-            role="button"
-            tabindex="0"
             onclick={() => workspace.openDoc(doc.relPath)}
-            onkeydown={(e) => e.key === "Enter" && workspace.openDoc(doc.relPath)}
           >
             📄 {doc.title}
-          </div>
+          </button>
         {/each}
+        {#if notes.length === 0}
+          <div class="hint">No notes.</div>
+        {/if}
       </div>
-    {:else}
-      <div class="section-title">Files</div>
-      <FileTree nodes={workspace.tree} />
-    {/if}
-
-    <div class="section-title">Tags</div>
-    {#if workspace.tags.length > 0}
-      <TagTree nodes={workspace.tags} />
-    {:else}
-      <div class="hint">No tags yet — add <code>#tags</code> to your notes.</div>
-    {/if}
+    </Panel>
   {:else}
-    <div class="hint">No vault open. Click <strong>Open Vault</strong> to choose a folder.</div>
+    <Panel title="Outline">
+      <Outline />
+    </Panel>
   {/if}
 </aside>
 
@@ -51,63 +62,32 @@
     width: 260px;
     flex: 0 0 auto;
     height: 100%;
-    overflow-y: auto;
+    overflow: hidden;
     border-right: 1px solid var(--border);
-    background: var(--toolbar-bg);
-    padding: 8px;
+    background: var(--sidebar-bg);
     display: flex;
     flex-direction: column;
-    gap: 4px;
   }
-  .actions {
-    display: flex;
-    gap: 6px;
-    margin-bottom: 4px;
-  }
-  .actions button {
-    flex: 1;
-    font: inherit;
-    font-size: 12px;
-    padding: 5px 8px;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    background: var(--button-bg);
-    color: inherit;
-    cursor: pointer;
-  }
-  .actions button:hover:not(:disabled) {
-    background: var(--button-hover-bg);
-  }
-  .actions button:disabled {
-    opacity: 0.4;
-    cursor: default;
-  }
-  .section-title {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-top: 10px;
-    padding: 0 6px;
+  .view-header {
+    flex: 0 0 auto;
+    padding: 8px 10px 4px;
     font-size: 11px;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
-    opacity: 0.55;
+    letter-spacing: 0.05em;
+    opacity: 0.6;
     font-weight: 700;
   }
-  .clear {
+  .notes {
+    display: flex;
+    flex-direction: column;
+  }
+  .note {
     border: none;
     background: none;
     color: inherit;
-    cursor: pointer;
-    opacity: 0.7;
-    font-size: 11px;
-  }
-  .doc-list {
-    display: flex;
-    flex-direction: column;
-  }
-  .doc {
-    padding: 3px 6px;
+    font: inherit;
+    text-align: left;
+    padding: 3px 8px;
     font-size: 13px;
     border-radius: 4px;
     cursor: pointer;
@@ -115,20 +95,32 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .doc:hover {
+  .note:hover {
     background: var(--button-hover-bg);
   }
-  .doc.active {
-    background: var(--accent-soft, rgba(59, 130, 246, 0.15));
+  .note.active {
+    background: var(--accent-soft);
     font-weight: 600;
+  }
+  .clear {
+    border: none;
+    background: none;
+    color: inherit;
+    cursor: pointer;
+    opacity: 0.7;
+    font-size: 12px;
+    padding: 2px 8px 6px;
+  }
+  .clear:hover {
+    opacity: 1;
   }
   .hint {
     font-size: 12px;
     opacity: 0.6;
-    padding: 8px 6px;
+    padding: 8px 10px;
     line-height: 1.5;
   }
-  .hint code {
+  .hint :global(code) {
     background: var(--button-hover-bg);
     padding: 0 3px;
     border-radius: 3px;
