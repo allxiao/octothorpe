@@ -61,12 +61,16 @@ const livePreviewTheme = EditorView.theme({
   },
   ".cm-md-strike": { textDecoration: "line-through", opacity: "0.7" },
   ".cm-md-link": { color: "#3b82f6", textDecoration: "underline", cursor: "pointer" },
-  ".cm-md-image": {
-    maxWidth: "100%",
-    borderRadius: "4px",
-    display: "block",
-    margin: "0.3em 0",
-  },
+  ".cm-md-image": { maxWidth: "100%", borderRadius: "4px" },
+  // Alone on a line: block, and collapse the line to the image height (the line
+  // otherwise keeps its text strut + CM's cursor-buffer images).
+  ".cm-md-image-block": { display: "block", margin: "0.15em 0" },
+  ".cm-md-image-line": { lineHeight: "0" },
+  ".cm-md-image-line .cm-widgetBuffer": { display: "none" },
+  // Surrounded by text: flow inline, vertically centred with the text.
+  ".cm-md-image-inline": { display: "inline-block", verticalAlign: "middle" },
+  // Live preview shown below the source while editing.
+  ".cm-md-image-preview": { display: "block", margin: "0.3em 0" },
   ".cm-md-hr": {
     display: "inline-block",
     width: "100%",

@@ -1,8 +1,12 @@
 import { WidgetType, type EditorView } from "@codemirror/view";
 
 /**
- * Renders an inline image. Clicking it selects the alt text and places the
- * caret just before `]` (Typora-style), which reveals the source for editing.
+ * Renders an image. Clicking it selects the alt text and places the caret just
+ * before `]` (Typora-style), which reveals the source for editing.
+ *
+ * `variant` controls layout: "block" (alone on a line), "inline" (flows with
+ * surrounding text, vertically centred), or "preview" (shown below the source
+ * while editing).
  */
 export class ImageWidget extends WidgetType {
   constructor(
@@ -10,6 +14,7 @@ export class ImageWidget extends WidgetType {
     readonly alt: string,
     readonly altFrom: number,
     readonly altTo: number,
+    readonly variant: "block" | "inline" | "preview" = "block",
   ) {
     super();
   }
@@ -18,14 +23,15 @@ export class ImageWidget extends WidgetType {
       other.src === this.src &&
       other.alt === this.alt &&
       other.altFrom === this.altFrom &&
-      other.altTo === this.altTo
+      other.altTo === this.altTo &&
+      other.variant === this.variant
     );
   }
   toDOM(view: EditorView) {
     const img = document.createElement("img");
     img.src = this.src;
     img.alt = this.alt;
-    img.className = "cm-md-image";
+    img.className = `cm-md-image cm-md-image-${this.variant}`;
     img.addEventListener("mousedown", (e) => {
       e.preventDefault();
       view.dispatch({ selection: { anchor: this.altFrom, head: this.altTo } });

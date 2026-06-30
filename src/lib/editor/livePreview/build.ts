@@ -144,20 +144,33 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
               const alt = m[1];
               const altFrom = node.from + 2;
               const altTo = altFrom + alt.length;
+              const line = state.doc.lineAt(node.from);
+              // Standalone = nothing but the image on its line.
+              const standalone =
+                slice(line.from, node.from).trim() === "" &&
+                slice(node.to, line.to).trim() === "";
               if (isElementActive(state, node.from, node.to)) {
-                // Editing: leave the raw markdown visible, show a preview after it.
+                // Editing: keep the raw markdown, show a preview below the line.
                 decos.push(
                   Decoration.widget({
-                    widget: new ImageWidget(src, alt, altFrom, altTo),
+                    widget: new ImageWidget(src, alt, altFrom, altTo, "preview"),
                     side: 1,
-                  }).range(node.to),
+                  }).range(line.to),
                 );
               } else {
-                // Rendered: replace the source with the image. Intentionally NOT
-                // atomic, so a click (or arrowing in) can reach the source to edit.
+                if (standalone) {
+                  // Collapse the line's text strut so no empty line height remains.
+                  lineClass(line.from, "cm-md-image-line");
+                }
                 decos.push(
                   Decoration.replace({
-                    widget: new ImageWidget(src, alt, altFrom, altTo),
+                    widget: new ImageWidget(
+                      src,
+                      alt,
+                      altFrom,
+                      altTo,
+                      standalone ? "block" : "inline",
+                    ),
                   }).range(node.from, node.to),
                 );
               }
