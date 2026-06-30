@@ -95,6 +95,101 @@
   <div class="menu">
     <button
       class="menu-title"
+      class:active={open === "edit"}
+      onclick={() => toggle("edit")}
+      onmouseenter={() => hover("edit")}
+    >
+      Edit
+    </button>
+    {#if open === "edit"}
+      <div class="dropdown" role="menu">
+        <button
+          role="menuitem"
+          disabled={!workspace.editCanUndo()}
+          onclick={() => run(() => workspace.editUndo())}
+        >
+          Undo<span class="key">Ctrl+Z</span>
+        </button>
+        <button
+          role="menuitem"
+          disabled={!workspace.editCanRedo()}
+          onclick={() => run(() => workspace.editRedo())}
+        >
+          Redo<span class="key">Ctrl+Y</span>
+        </button>
+        <div class="sep"></div>
+        <button
+          role="menuitem"
+          disabled={!workspace.hasDoc}
+          onclick={() => run(() => workspace.editCut())}
+        >
+          Cut<span class="key">Ctrl+X</span>
+        </button>
+        <button
+          role="menuitem"
+          disabled={!workspace.hasDoc}
+          onclick={() => run(() => workspace.editCopy())}
+        >
+          Copy<span class="key">Ctrl+C</span>
+        </button>
+        <button
+          role="menuitem"
+          disabled={!workspace.imageAtCursor()}
+          onclick={() => run(() => workspace.copyImageContent())}
+        >
+          Copy Image Content
+        </button>
+        <button
+          role="menuitem"
+          disabled={!workspace.hasDoc}
+          onclick={() => run(() => workspace.editPaste())}
+        >
+          Paste<span class="key">Ctrl+V</span>
+        </button>
+        <div class="sep"></div>
+        <button
+          role="menuitem"
+          disabled={!workspace.hasDoc}
+          onclick={() => run(() => workspace.copyAsPlainText())}
+        >
+          Copy as Plain Text
+        </button>
+        <button
+          role="menuitem"
+          disabled={!workspace.hasDoc}
+          onclick={() => run(() => workspace.copyAsMarkdown())}
+        >
+          Copy as Markdown<span class="key">Ctrl+Shift+C</span>
+        </button>
+        <button
+          role="menuitem"
+          disabled={!workspace.hasDoc}
+          onclick={() => run(() => workspace.copyAsHtmlCode())}
+        >
+          Copy as HTML Code
+        </button>
+        <button
+          role="menuitem"
+          disabled={!workspace.hasDoc}
+          onclick={() => run(() => workspace.copyWithoutThemeStyling())}
+        >
+          Copy without Theme Styling
+        </button>
+        <div class="sep"></div>
+        <button
+          role="menuitem"
+          disabled={!workspace.hasDoc}
+          onclick={() => run(() => workspace.editPaste())}
+        >
+          Paste as Plain Text<span class="key">Ctrl+Shift+V</span>
+        </button>
+      </div>
+    {/if}
+  </div>
+
+  <div class="menu">
+    <button
+      class="menu-title"
       class:active={open === "view"}
       onclick={() => toggle("view")}
       onmouseenter={() => hover("view")}

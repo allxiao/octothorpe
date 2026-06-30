@@ -52,6 +52,12 @@
     } else if (k === "s" && e.shiftKey) {
       e.preventDefault();
       void workspace.saveAs();
+    } else if (k === "c" && e.shiftKey) {
+      e.preventDefault();
+      void workspace.copyAsMarkdown();
+    } else if (k === "v" && e.shiftKey) {
+      e.preventDefault();
+      void workspace.editPaste();
     } else if (k === "w") {
       e.preventDefault();
       void ipc.closeWindow();
