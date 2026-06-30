@@ -10,6 +10,7 @@ use state::AppState;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .manage(AppState::new())
         .invoke_handler(tauri::generate_handler![
             commands::documents::read_file,
@@ -32,6 +33,9 @@ pub fn run() {
             commands::system::startup_options,
             commands::system::show_properties,
             commands::system::reveal_in_dir,
+            commands::edit::markdown_to_html,
+            commands::edit::markdown_to_plaintext,
+            commands::edit::copy_image,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
