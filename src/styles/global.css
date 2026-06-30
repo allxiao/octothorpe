@@ -3,6 +3,8 @@
   --toolbar-bg: #fafafa;
   --button-bg: #ffffff;
   --button-hover-bg: #f0f0f0;
+  --accent: #3b82f6;
+  --accent-soft: rgba(59, 130, 246, 0.15);
   --editor-font: ui-monospace, "SF Mono", "Cascadia Code", "Fira Code", Menlo,
     Consolas, monospace;
   color-scheme: light dark;
@@ -14,6 +16,7 @@
     --toolbar-bg: #1c1c1f;
     --button-bg: #242428;
     --button-hover-bg: #2e2e33;
+    --accent-soft: rgba(59, 130, 246, 0.25);
   }
 }
 

@@ -1,76 +1,73 @@
 <script lang="ts">
+  import { workspace } from "./lib/stores/workspace.svelte";
+  import Sidebar from "./lib/components/Sidebar.svelte";
   import EditorHost from "./lib/editor/EditorHost.svelte";
-  import { openMarkdownFile, saveMarkdownFile } from "./lib/ipc/commands";
 
-  let content = $state(
-    "# Welcome to typedown\n\nA Markdown editor that renders **while you type** — put your cursor on a line to edit its raw source, move away to see it rendered.\n\n## Try it\n\n- Make text **bold**, *italic*, or ~~struck through~~\n- Add `inline code` or a [link](https://example.com)\n- [ ] check off a task\n- [x] this one is done\n\n> Tip: broken or half-typed Markdown still renders, best-effort.\n",
-  );
-  let currentPath = $state<string | null>(null);
-  let dirty = $state(false);
-  let status = $state("");
-
-  // Folder of the open document, used to resolve relative image paths.
-  let baseDir = $derived(currentPath ? currentPath.replace(/[\\/][^\\/]*$/, "") : "");
-
-  async function handleOpen() {
-    try {
-      const result = await openMarkdownFile();
-      if (result) {
-        content = result.content;
-        currentPath = result.path;
-        dirty = false;
-        status = `Opened ${result.path}`;
-      }
-    } catch (err) {
-      status = `Open failed: ${err}`;
-    }
-  }
-
-  async function handleSave() {
-    try {
-      const path = await saveMarkdownFile(currentPath, content);
-      if (path) {
-        currentPath = path;
-        dirty = false;
-        status = `Saved ${path}`;
-      }
-    } catch (err) {
-      status = `Save failed: ${err}`;
-    }
-  }
-
-  function handleChange(next: string) {
-    content = next;
-    dirty = true;
+  function handleSave() {
+    void workspace.save();
   }
 </script>
 
 <div class="app">
-  <header class="toolbar">
-    <button onclick={handleOpen}>Open</button>
-    <button onclick={handleSave}>Save</button>
-    <span class="path">{currentPath ?? "Untitled"}{dirty ? " •" : ""}</span>
-    <span class="status">{status}</span>
-  </header>
-  <main class="editor-pane">
-    <EditorHost {content} {baseDir} onchange={handleChange} onsave={handleSave} />
-  </main>
+  <Sidebar />
+  <div class="main">
+    <header class="toolbar">
+      <span class="title">
+        {workspace.activeRelPath ? workspace.activeTitle : "typedown"}
+        {#if workspace.dirty}<span class="dot">•</span>{/if}
+      </span>
+      <button onclick={handleSave} disabled={!workspace.activeRelPath || !workspace.dirty}>
+        Save
+      </button>
+      <span class="status">{workspace.status}</span>
+    </header>
+
+    {#if workspace.activeRelPath}
+      <main class="editor-pane">
+        <EditorHost
+          content={workspace.content}
+          baseDir={workspace.baseDir}
+          onchange={(v) => workspace.setContent(v)}
+          onsave={handleSave}
+        />
+      </main>
+    {:else}
+      <div class="empty">
+        {#if workspace.root}
+          Select a note from the sidebar, or create one with <strong>New Note</strong>.
+        {:else}
+          Open a vault to start. Your notes are plain <code>.md</code> files on disk.
+        {/if}
+      </div>
+    {/if}
+  </div>
 </div>
 
 <style>
   .app {
     display: flex;
-    flex-direction: column;
     height: 100vh;
+  }
+  .main {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
   }
   .toolbar {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 6px 10px;
+    gap: 10px;
+    padding: 6px 12px;
     border-bottom: 1px solid var(--border);
     background: var(--toolbar-bg);
     flex: 0 0 auto;
+  }
+  .title {
+    font-weight: 600;
+  }
+  .dot {
+    color: var(--accent, #3b82f6);
   }
   .toolbar button {
     font: inherit;
@@ -81,12 +78,9 @@
     color: inherit;
     cursor: pointer;
   }
-  .toolbar button:hover {
-    background: var(--button-hover-bg);
-  }
-  .path {
-    margin-left: 8px;
-    font-weight: 600;
+  .toolbar button:disabled {
+    opacity: 0.4;
+    cursor: default;
   }
   .status {
     margin-left: auto;
@@ -97,5 +91,20 @@
     flex: 1 1 auto;
     min-height: 0;
     overflow: hidden;
+  }
+  .empty {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    opacity: 0.6;
+    padding: 24px;
+    line-height: 1.6;
+  }
+  .empty code {
+    background: var(--button-hover-bg);
+    padding: 0 4px;
+    border-radius: 3px;
   }
 </style>
