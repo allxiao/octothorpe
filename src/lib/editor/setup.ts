@@ -5,6 +5,7 @@ import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirro
 import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from "@codemirror/language";
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
 import { markdownLang } from "./markdownLang";
+import { livePreview } from "./livePreview";
 
 /**
  * Base CodeMirror extensions shared by the editor. The live-preview decoration
@@ -21,6 +22,7 @@ export function baseExtensions(onSave?: () => void): Extension[] {
     bracketMatching(),
     syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
     markdownLang(),
+    livePreview(),
     EditorView.lineWrapping,
     keymap.of([
       {

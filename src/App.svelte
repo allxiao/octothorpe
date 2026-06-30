@@ -3,7 +3,7 @@
   import { openMarkdownFile, saveMarkdownFile } from "./lib/ipc/commands";
 
   let content = $state(
-    "# Welcome to typedown\n\nStart typing your **markdown** here.\n\n- A list item\n- Another item\n\n> A blockquote\n",
+    "# Welcome to typedown\n\nA Markdown editor that renders **while you type** — put your cursor on a line to edit its raw source, move away to see it rendered.\n\n## Try it\n\n- Make text **bold**, *italic*, or ~~struck through~~\n- Add `inline code` or a [link](https://example.com)\n- [ ] check off a task\n- [x] this one is done\n\n> Tip: broken or half-typed Markdown still renders, best-effort.\n",
   );
   let currentPath = $state<string | null>(null);
   let dirty = $state(false);

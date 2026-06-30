@@ -1,0 +1,83 @@
+import {
+  ViewPlugin,
+  EditorView,
+  Decoration,
+  type DecorationSet,
+  type ViewUpdate,
+} from "@codemirror/view";
+import type { Extension } from "@codemirror/state";
+import { buildDecorations } from "./build";
+
+/**
+ * Live-preview ViewPlugin. Rebuilds decorations on document, viewport, or
+ * selection changes — viewport-scoped so typing stays smooth in large docs.
+ */
+class LivePreviewPlugin {
+  decorations: DecorationSet;
+  atomic: DecorationSet;
+
+  constructor(view: EditorView) {
+    const built = buildDecorations(view);
+    this.decorations = built.decorations;
+    this.atomic = built.atomic;
+  }
+
+  update(update: ViewUpdate) {
+    if (update.docChanged || update.viewportChanged || update.selectionSet) {
+      const built = buildDecorations(update.view);
+      this.decorations = built.decorations;
+      this.atomic = built.atomic;
+    }
+  }
+}
+
+const livePreviewPlugin = ViewPlugin.fromClass(LivePreviewPlugin, {
+  decorations: (v) => v.decorations,
+  // Make hidden/replaced spans atomic so the cursor and selection step over
+  // them instead of landing inside a marker that isn't visible.
+  provide: (plugin) =>
+    EditorView.atomicRanges.of((view) => view.plugin(plugin)?.atomic ?? Decoration.none),
+});
+
+const livePreviewTheme = EditorView.theme({
+  ".cm-md-heading": { fontWeight: "700", lineHeight: "1.25" },
+  ".cm-md-h1": { fontSize: "1.9em" },
+  ".cm-md-h2": { fontSize: "1.6em" },
+  ".cm-md-h3": { fontSize: "1.35em" },
+  ".cm-md-h4": { fontSize: "1.15em" },
+  ".cm-md-h5": { fontSize: "1.05em" },
+  ".cm-md-h6": { fontSize: "1em", opacity: "0.8" },
+  ".cm-md-quote": {
+    borderLeft: "3px solid var(--border, #ccc)",
+    paddingLeft: "0.8em",
+    opacity: "0.85",
+    fontStyle: "italic",
+  },
+  ".cm-md-code": {
+    fontFamily: "var(--editor-font, monospace)",
+    background: "rgba(135, 131, 120, 0.18)",
+    borderRadius: "3px",
+    padding: "0.1em 0.3em",
+  },
+  ".cm-md-strike": { textDecoration: "line-through", opacity: "0.7" },
+  ".cm-md-link": { color: "#3b82f6", textDecoration: "underline", cursor: "pointer" },
+  ".cm-md-image": {
+    maxWidth: "100%",
+    borderRadius: "4px",
+    display: "block",
+    margin: "0.3em 0",
+  },
+  ".cm-md-hr": {
+    display: "inline-block",
+    width: "100%",
+    borderTop: "2px solid var(--border, #ccc)",
+    verticalAlign: "middle",
+  },
+  ".cm-md-bullet": { color: "#888" },
+  ".cm-md-task": { marginRight: "0.4em", verticalAlign: "middle", cursor: "pointer" },
+});
+
+/** The full live-preview extension bundle. */
+export function livePreview(): Extension {
+  return [livePreviewPlugin, livePreviewTheme];
+}
