@@ -30,6 +30,8 @@ pub fn run() {
             commands::vault::delete_document,
             commands::system::new_window,
             commands::system::startup_options,
+            commands::system::show_properties,
+            commands::system::reveal_in_dir,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
