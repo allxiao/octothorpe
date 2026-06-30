@@ -36,16 +36,25 @@
     void workspace.save();
   }
 
-  // Global shortcuts: Ctrl/Cmd+O open vault, Ctrl/Cmd+N new note.
+  // Global File-menu shortcuts. Plain Ctrl/Cmd+S is handled by the editor keymap.
   function onKeydown(e: KeyboardEvent) {
     const mod = e.ctrlKey || e.metaKey;
     if (!mod) return;
-    if (e.key === "o") {
+    const k = e.key.toLowerCase();
+    if (k === "o") {
       e.preventDefault();
-      void workspace.openVault();
-    } else if (e.key === "n") {
+      if (e.shiftKey) void workspace.openVault();
+      else void workspace.openFile();
+    } else if (k === "n") {
       e.preventDefault();
-      if (workspace.root) void workspace.newNote();
+      if (e.shiftKey) void ipc.newWindow();
+      else workspace.newFile();
+    } else if (k === "s" && e.shiftKey) {
+      e.preventDefault();
+      void workspace.saveAs();
+    } else if (k === "w") {
+      e.preventDefault();
+      void ipc.closeWindow();
     }
   }
 </script>
@@ -83,9 +92,10 @@
       {:else}
         <div class="empty">
           {#if workspace.root}
-            Select a note from the sidebar, or create one with <strong>New Note</strong>.
+            Select a note from the sidebar, or create one with <strong>New</strong>.
           {:else}
-            Open a vault to start. Your notes are plain <code>.md</code> files on disk.
+            Open a folder, or start a new document with <strong>New</strong> (Ctrl+N).
+            Your notes are plain <code>.md</code> files on disk.
           {/if}
         </div>
       {/if}

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { workspace } from "../stores/workspace.svelte";
+  import * as ipc from "../ipc/commands";
 
   let open = $state<string | null>(null);
 
@@ -33,23 +34,59 @@
     </button>
     {#if open === "file"}
       <div class="dropdown" role="menu">
-        <button role="menuitem" onclick={() => run(() => workspace.openVault())}>
-          Open Vault…<span class="key">Ctrl+O</span>
+        <button role="menuitem" onclick={() => run(() => workspace.newFile())}>
+          New<span class="key">Ctrl+N</span>
         </button>
-        <button
-          role="menuitem"
-          disabled={!workspace.root}
-          onclick={() => run(() => workspace.newNote())}
-        >
-          New Note<span class="key">Ctrl+N</span>
+        <button role="menuitem" onclick={() => run(() => ipc.newWindow())}>
+          New Window<span class="key">Ctrl+Shift+N</span>
+        </button>
+        <div class="sep"></div>
+        <button role="menuitem" onclick={() => run(() => workspace.openFile())}>
+          Open…<span class="key">Ctrl+O</span>
+        </button>
+        <button role="menuitem" onclick={() => run(() => workspace.openVault())}>
+          Open Folder…<span class="key">Ctrl+Shift+O</span>
         </button>
         <div class="sep"></div>
         <button
           role="menuitem"
-          disabled={!workspace.activeRelPath || !workspace.dirty}
+          disabled={!workspace.hasDoc || !workspace.dirty}
           onclick={() => run(() => workspace.save())}
         >
           Save<span class="key">Ctrl+S</span>
+        </button>
+        <button
+          role="menuitem"
+          disabled={!workspace.hasDoc}
+          onclick={() => run(() => workspace.saveAs())}
+        >
+          Save As…<span class="key">Ctrl+Shift+S</span>
+        </button>
+        <div class="sep"></div>
+        <button
+          role="menuitem"
+          disabled={!workspace.activeAbsPath}
+          onclick={() => run(() => workspace.showProperties())}
+        >
+          Properties…
+        </button>
+        <button
+          role="menuitem"
+          disabled={!workspace.activeAbsPath}
+          onclick={() => run(() => workspace.revealLocation())}
+        >
+          Open File Location…
+        </button>
+        <button
+          role="menuitem"
+          disabled={!workspace.activeAbsPath}
+          onclick={() => run(() => workspace.deleteActive())}
+        >
+          Delete…
+        </button>
+        <div class="sep"></div>
+        <button role="menuitem" onclick={() => run(() => ipc.closeWindow())}>
+          Close<span class="key">Ctrl+W</span>
         </button>
       </div>
     {/if}
