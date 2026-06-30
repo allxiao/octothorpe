@@ -84,7 +84,7 @@ fn index_file(tx: &Transaction, vault: &Vault, rel: &str) -> AppResult<()> {
         .or_else(|| file_name.strip_suffix(".md"))
         .unwrap_or(&file_name);
     let title = extract_title(&content, stem);
-    let body = crate::core::markdown::to_plaintext(&content);
+    let body = crate::core::markdown::segment_cjk(&crate::core::markdown::to_plaintext(&content));
 
     // UPSERT keyed on rel_path so the document's id (and thus the FTS rowid) is
     // stable across reindexes.
@@ -121,11 +121,12 @@ fn index_file(tx: &Transaction, vault: &Vault, rel: &str) -> AppResult<()> {
         )?;
     }
 
-    // Keep the full-text row (rowid == documents.id) in sync.
+    // Keep the full-text row (rowid == documents.id) in sync. Title is also
+    // CJK-segmented so non-spaced scripts are searchable.
     tx.execute("DELETE FROM documents_fts WHERE rowid = ?1", params![doc_id])?;
     tx.execute(
         "INSERT INTO documents_fts (rowid, title, body) VALUES (?1, ?2, ?3)",
-        params![doc_id, title, body],
+        params![doc_id, crate::core::markdown::segment_cjk(&title), body],
     )?;
     Ok(())
 }

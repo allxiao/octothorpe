@@ -14,15 +14,44 @@ use crate::error::AppResult;
 const HL_START: &str = "\u{0001}";
 const HL_END: &str = "\u{0002}";
 
-/// Turn free-text input into a safe FTS5 query: each whitespace token becomes a
-/// quoted prefix term (implicit AND). Quoting avoids FTS5 syntax errors on
-/// arbitrary input.
+/// Turn free-text input into a safe FTS5 query. ASCII runs become quoted prefix
+/// terms; CJK runs become character phrases (matching the per-character tokens
+/// produced by `segment_cjk`). Quoting avoids FTS5 syntax errors on any input.
 fn fts_query(input: &str) -> String {
-    input
-        .split_whitespace()
-        .map(|t| format!("\"{}\"*", t.replace('"', "\"\"")))
-        .collect::<Vec<_>>()
-        .join(" ")
+    use crate::core::markdown::is_cjk;
+    let mut parts: Vec<String> = Vec::new();
+    let mut ascii = String::new();
+    let mut cjk: Vec<char> = Vec::new();
+
+    fn flush_ascii(parts: &mut Vec<String>, ascii: &mut String) {
+        if !ascii.is_empty() {
+            parts.push(format!("\"{}\"*", ascii.replace('"', "\"\"")));
+            ascii.clear();
+        }
+    }
+    fn flush_cjk(parts: &mut Vec<String>, cjk: &mut Vec<char>) {
+        if !cjk.is_empty() {
+            let phrase = cjk.iter().map(|c| c.to_string()).collect::<Vec<_>>().join(" ");
+            parts.push(format!("\"{phrase}\""));
+            cjk.clear();
+        }
+    }
+
+    for c in input.chars() {
+        if is_cjk(c) {
+            flush_ascii(&mut parts, &mut ascii);
+            cjk.push(c);
+        } else if c.is_alphanumeric() {
+            flush_cjk(&mut parts, &mut cjk);
+            ascii.push(c);
+        } else {
+            flush_ascii(&mut parts, &mut ascii);
+            flush_cjk(&mut parts, &mut cjk);
+        }
+    }
+    flush_ascii(&mut parts, &mut ascii);
+    flush_cjk(&mut parts, &mut cjk);
+    parts.join(" ")
 }
 
 /// Full-text search over note bodies, ranked by bm25, optionally restricted to a
@@ -46,7 +75,7 @@ pub fn search(
             id: rel.clone(),
             rel_path: rel,
             title: r.get(1)?,
-            snippet: r.get(2)?,
+            snippet: crate::core::markdown::desegment_cjk(&r.get::<_, String>(2)?),
             score: r.get(3)?,
         })
     };
@@ -358,6 +387,32 @@ mod tests {
         assert_eq!(search(&conn, "pizza", None, None).unwrap().len(), 0);
         // Empty query -> no results, no error.
         assert_eq!(search(&conn, "   ", None, None).unwrap().len(), 0);
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn full_text_search_chinese() {
+        let dir = std::env::temp_dir().join("typedown_cjk_test");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("a.md"), "# 笔记\n\n这是一个关于中文搜索的测试。").unwrap();
+        std::fs::write(dir.join("b.md"), "# 美食\n\n红烧肉是经典中国菜。").unwrap();
+
+        let vault = Vault::new(dir.clone());
+        let mut conn = db::open_in_memory().unwrap();
+        scan::rescan(&mut conn, &vault).unwrap();
+
+        // multi-character phrase
+        let hits = search(&conn, "中文搜索", None, None).unwrap();
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].rel_path, "a.md");
+        // two-character word inside a longer run
+        assert_eq!(search(&conn, "搜索", None, None).unwrap().len(), 1);
+        // a different note
+        assert_eq!(search(&conn, "红烧肉", None, None).unwrap().len(), 1);
+        // snippet reads naturally (no inter-character spaces)
+        assert!(search(&conn, "搜索", None, None).unwrap()[0].snippet.contains("搜索"));
 
         std::fs::remove_dir_all(&dir).ok();
     }
