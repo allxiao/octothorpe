@@ -2,8 +2,12 @@
   import { onMount, onDestroy } from "svelte";
   import { EditorView } from "@codemirror/view";
   import { EditorState, Compartment, Annotation } from "@codemirror/state";
+  import { undo, redo, undoDepth, redoDepth } from "@codemirror/commands";
+  import { syntaxTree } from "@codemirror/language";
   import { baseExtensions } from "./setup";
   import { imageBaseDir, onTagClick } from "./livePreview/config";
+  import { resolveImageFsPath } from "./livePreview/build";
+  import type { EditorApi } from "../stores/workspace.svelte";
 
   let {
     content = "",
@@ -18,7 +22,7 @@
     onchange?: (value: string) => void;
     onsave?: () => void;
     ontagclick?: (tag: string) => void;
-    onready?: (api: { gotoLine: (line: number) => void } | null) => void;
+    onready?: (api: EditorApi | null) => void;
   } = $props();
 
   let host: HTMLDivElement;
@@ -38,6 +42,80 @@
     view.focus();
   }
 
+  // --- Edit-menu operations (driven from the menu / shortcuts) -------------
+
+  function canUndo() {
+    return view ? undoDepth(view.state) > 0 : false;
+  }
+  function canRedo() {
+    return view ? redoDepth(view.state) > 0 : false;
+  }
+
+  /** Selected text (joined across ranges), or the current line if nothing is selected. */
+  function copyText(): string {
+    if (!view) return "";
+    const { state } = view;
+    const ranges = state.selection.ranges.filter((r) => !r.empty);
+    if (ranges.length) return ranges.map((r) => state.sliceDoc(r.from, r.to)).join("\n");
+    return state.doc.lineAt(state.selection.main.head).text;
+  }
+
+  /** Like copyText, but removes it from the document (the whole line if no selection). */
+  function cutText(): string {
+    if (!view) return "";
+    const { state } = view;
+    const ranges = state.selection.ranges.filter((r) => !r.empty);
+    if (ranges.length) {
+      const text = ranges.map((r) => state.sliceDoc(r.from, r.to)).join("\n");
+      view.dispatch(state.replaceSelection(""));
+      view.focus();
+      return text;
+    }
+    const line = state.doc.lineAt(state.selection.main.head);
+    const to = Math.min(line.to + 1, state.doc.length); // include the trailing newline
+    view.dispatch({ changes: { from: line.from, to }, selection: { anchor: line.from } });
+    view.focus();
+    return line.text;
+  }
+
+  function paste(text: string) {
+    if (!view) return;
+    view.dispatch(view.state.replaceSelection(text));
+    view.focus();
+  }
+
+  /** Selected text, or the whole document if nothing is selected (for "Copy as…"). */
+  function selectionOrDoc(): string {
+    if (!view) return "";
+    const { state } = view;
+    const ranges = state.selection.ranges.filter((r) => !r.empty);
+    if (ranges.length) return ranges.map((r) => state.sliceDoc(r.from, r.to)).join("\n");
+    return state.doc.toString();
+  }
+
+  /** Filesystem path/URL of the image under the caret, or null. */
+  function imageAtCursor(): string | null {
+    if (!view) return null;
+    const { state } = view;
+    const pos = state.selection.main.head;
+    let src: string | null = null;
+    syntaxTree(state).iterate({
+      from: pos,
+      to: pos,
+      enter: (node) => {
+        if (node.name === "Image") {
+          const m = /^!\[([^\]]*)\]\(([^)\s]+)[^)]*\)$/.exec(state.sliceDoc(node.from, node.to));
+          if (m) src = resolveImageFsPath(m[2], baseDir);
+        }
+      },
+    });
+    return src;
+  }
+
+  function focusEditor() {
+    view?.focus();
+  }
+
   onMount(() => {
     const state = EditorState.create({
       doc: content,
@@ -54,7 +132,19 @@
     });
     view = new EditorView({ state, parent: host });
     view.focus();
-    onready?.({ gotoLine });
+    onready?.({
+      gotoLine,
+      undo: () => view && undo(view),
+      redo: () => view && redo(view),
+      canUndo,
+      canRedo,
+      copyText,
+      cutText,
+      paste,
+      selectionOrDoc,
+      imageAtCursor,
+      focus: focusEditor,
+    });
     // Dev-only hook so the live preview can be driven/inspected in a browser.
     if (import.meta.env.DEV) {
       (window as unknown as { __cmView?: EditorView }).__cmView = view;

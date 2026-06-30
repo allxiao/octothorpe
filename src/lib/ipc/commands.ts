@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { ask, open, save } from "@tauri-apps/plugin-dialog";
+import { writeText, readText, writeHtml } from "@tauri-apps/plugin-clipboard-manager";
 import type {
   DocumentContent,
   DocumentMeta,
@@ -103,3 +104,16 @@ export async function confirmDelete(name: string): Promise<boolean> {
     kind: "warning",
   });
 }
+
+// --- Clipboard & Markdown conversions (Edit menu) -------------------------
+
+export const clipboardWriteText = (text: string) => writeText(text);
+export const clipboardReadText = () => readText();
+export const clipboardWriteHtml = (html: string) => writeHtml(html);
+
+export const markdownToHtml = (markdown: string) =>
+  invoke<string>("markdown_to_html", { markdown });
+export const markdownToPlaintext = (markdown: string) =>
+  invoke<string>("markdown_to_plaintext", { markdown });
+/** Copy a local image file's pixels to the system clipboard. */
+export const copyImage = (src: string) => invoke<void>("copy_image", { src });

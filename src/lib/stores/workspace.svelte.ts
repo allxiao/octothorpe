@@ -14,6 +14,16 @@ export interface OutlineItem {
 
 export interface EditorApi {
   gotoLine: (line: number) => void;
+  undo: () => void;
+  redo: () => void;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
+  copyText: () => string;
+  cutText: () => string;
+  paste: (text: string) => void;
+  selectionOrDoc: () => string;
+  imageAtCursor: () => string | null;
+  focus: () => void;
 }
 
 class Workspace {
@@ -99,6 +109,103 @@ class Workspace {
 
   gotoLine(line: number) {
     this.#editor?.gotoLine(line);
+  }
+
+  // --- edit menu -----------------------------------------------------------
+
+  editUndo() {
+    this.#editor?.undo();
+  }
+  editRedo() {
+    this.#editor?.redo();
+  }
+  editCanUndo(): boolean {
+    return this.#editor?.canUndo() ?? false;
+  }
+  editCanRedo(): boolean {
+    return this.#editor?.canRedo() ?? false;
+  }
+  imageAtCursor(): string | null {
+    return this.#editor?.imageAtCursor() ?? null;
+  }
+
+  async editCopy() {
+    try {
+      const text = this.#editor?.copyText() ?? "";
+      if (text) await ipc.clipboardWriteText(text);
+    } catch (e) {
+      this.status = `Copy failed: ${e}`;
+    }
+    this.#editor?.focus();
+  }
+
+  async editCut() {
+    try {
+      const text = this.#editor?.cutText() ?? "";
+      if (text) await ipc.clipboardWriteText(text);
+    } catch (e) {
+      this.status = `Cut failed: ${e}`;
+    }
+  }
+
+  async editPaste() {
+    try {
+      const text = await ipc.clipboardReadText();
+      if (text) this.#editor?.paste(text);
+    } catch (e) {
+      this.status = `Paste failed: ${e}`;
+    }
+  }
+
+  async copyAsMarkdown() {
+    try {
+      const md = this.#editor?.selectionOrDoc() ?? "";
+      if (md) await ipc.clipboardWriteText(md);
+    } catch (e) {
+      this.status = `Copy failed: ${e}`;
+    }
+    this.#editor?.focus();
+  }
+
+  async copyAsPlainText() {
+    try {
+      const md = this.#editor?.selectionOrDoc() ?? "";
+      if (md) await ipc.clipboardWriteText(await ipc.markdownToPlaintext(md));
+    } catch (e) {
+      this.status = `Copy failed: ${e}`;
+    }
+    this.#editor?.focus();
+  }
+
+  async copyAsHtmlCode() {
+    try {
+      const md = this.#editor?.selectionOrDoc() ?? "";
+      if (md) await ipc.clipboardWriteText(await ipc.markdownToHtml(md));
+    } catch (e) {
+      this.status = `Copy failed: ${e}`;
+    }
+    this.#editor?.focus();
+  }
+
+  async copyWithoutThemeStyling() {
+    try {
+      const md = this.#editor?.selectionOrDoc() ?? "";
+      if (md) await ipc.clipboardWriteHtml(await ipc.markdownToHtml(md));
+    } catch (e) {
+      this.status = `Copy failed: ${e}`;
+    }
+    this.#editor?.focus();
+  }
+
+  async copyImageContent() {
+    const src = this.#editor?.imageAtCursor();
+    if (!src) return;
+    try {
+      await ipc.copyImage(src);
+      this.status = "Image copied";
+    } catch (e) {
+      this.status = `Copy image failed: ${e}`;
+    }
   }
 
   // --- vault ---------------------------------------------------------------

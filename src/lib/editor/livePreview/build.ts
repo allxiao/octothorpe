@@ -26,6 +26,20 @@ function resolveImageSrc(url: string, baseDir: string): string | null {
   }
 }
 
+/**
+ * Resolve a Markdown image URL to a filesystem path (for reading its bytes, e.g.
+ * "Copy Image Content"). Remote/`data:` URLs pass through unchanged (the caller
+ * decides what to do); relative paths are joined against the document's folder.
+ * Returns null when it can't be resolved.
+ */
+export function resolveImageFsPath(url: string, baseDir: string): string | null {
+  if (/^(https?:|data:)/i.test(url)) return url;
+  if (/^file:/i.test(url)) return decodeURI(url.replace(/^file:\/*/i, ""));
+  if (!baseDir) return null;
+  const sep = baseDir.includes("\\") ? "\\" : "/";
+  return baseDir.replace(/[\\/]+$/, "") + sep + url.replace(/\//g, sep);
+}
+
 export interface BuiltDecorations {
   /** All decorations: marker hiding, inline styling, line classes, widgets. */
   decorations: DecorationSet;
