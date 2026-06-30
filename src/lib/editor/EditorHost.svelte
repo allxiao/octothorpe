@@ -31,6 +31,10 @@
     });
     view = new EditorView({ state, parent: host });
     view.focus();
+    // Dev-only hook so the live preview can be driven/inspected in a browser.
+    if (import.meta.env.DEV) {
+      (window as unknown as { __cmView?: EditorView }).__cmView = view;
+    }
   });
 
   onDestroy(() => view?.destroy());

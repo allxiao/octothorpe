@@ -1,20 +1,32 @@
 import type { EditorState } from "@codemirror/state";
 
 /**
- * Obsidian-style reveal rule: a node is "active" (its raw Markdown markers are
- * shown instead of being rendered) when the selection touches any line the node
- * spans. The line under the cursor shows source; every other line renders.
+ * Element-level reveal (Typora/Bear style): a node shows its raw Markdown only
+ * when the selection actually touches the node's own range. Editing one element
+ * on a line leaves the other elements on that line rendered.
  *
- * We expand the node range to whole lines so that placing the cursor anywhere on
- * a line reveals the markup for constructs on that line.
+ * Boundaries are inclusive, so a caret resting immediately before or after the
+ * element still reveals it (you're "in" it for editing purposes).
  */
-export function isRangeActive(state: EditorState, from: number, to: number): boolean {
+export function isElementActive(state: EditorState, from: number, to: number): boolean {
+  for (const range of state.selection.ranges) {
+    if (range.from <= to && range.to >= from) return true;
+  }
+  return false;
+}
+
+/**
+ * Line-level reveal: used for line-scoped markers (heading `#`, blockquote `>`)
+ * whose only raw part is the marker itself — the rendered text/styling of the
+ * line is unaffected by showing it. A node is active when the selection touches
+ * any line the node spans.
+ */
+export function isLineActive(state: EditorState, from: number, to: number): boolean {
   const startLine = state.doc.lineAt(from);
   const endLine = to <= startLine.to ? startLine : state.doc.lineAt(to);
   const lineFrom = startLine.from;
   const lineTo = endLine.to;
   for (const range of state.selection.ranges) {
-    // Overlap test between the selection range and the node's line span.
     if (range.from <= lineTo && range.to >= lineFrom) return true;
   }
   return false;

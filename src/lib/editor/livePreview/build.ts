@@ -1,7 +1,7 @@
 import { Decoration, type DecorationSet, type EditorView } from "@codemirror/view";
 import { syntaxTree } from "@codemirror/language";
 import { type Range } from "@codemirror/state";
-import { isRangeActive } from "./reveal";
+import { isElementActive, isLineActive } from "./reveal";
 import { ImageWidget, HrWidget, BulletWidget, CheckboxWidget } from "./widgets";
 
 export interface BuiltDecorations {
@@ -13,8 +13,9 @@ export interface BuiltDecorations {
 
 /**
  * Walk the Lezer syntax tree over the visible ranges only (for performance) and
- * produce live-preview decorations. Nodes whose line the cursor sits on are left
- * as raw source (Obsidian-style reveal); everything else is rendered.
+ * produce live-preview decorations. Inline elements (bold, italic, code, links,
+ * images, ...) reveal their raw source only when the cursor is within that
+ * element (Typora/Bear style); line markers (`#`, `>`) reveal per line.
  */
 export function buildDecorations(view: EditorView): BuiltDecorations {
   const { state } = view;
@@ -61,7 +62,8 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
           return;
         }
         if (name === "HeaderMark") {
-          if (!isRangeActive(state, node.from, node.to)) {
+          // Line-level: the '#' is the only raw part; heading text renders either way.
+          if (!isLineActive(state, node.from, node.to)) {
             // Hide the '#' run plus a single trailing space.
             const after = slice(node.to, node.to + 1) === " " ? node.to + 1 : node.to;
             hide(node.from, after);
@@ -69,9 +71,20 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
           return;
         }
 
-        // --- Inline emphasis / code / strikethrough: hide the marks ---
-        if (name === "EmphasisMark" || name === "CodeMark" || name === "StrikethroughMark") {
-          if (!isRangeActive(state, node.from, node.to)) hide(node.from, node.to);
+        // --- Inline emphasis / code / strikethrough: hide marks when the
+        //     cursor is outside the *element* (not merely off the line) ---
+        if (name === "EmphasisMark" || name === "StrikethroughMark") {
+          const el = node.node.parent ?? node;
+          if (!isElementActive(state, el.from, el.to)) hide(node.from, node.to);
+          return;
+        }
+        if (name === "CodeMark") {
+          // Only hide inline-code backticks; leave fenced-code fences visible.
+          const parent = node.node.parent;
+          if (parent && parent.name === "InlineCode" &&
+              !isElementActive(state, parent.from, parent.to)) {
+            hide(node.from, node.to);
+          }
           return;
         }
         if (name === "InlineCode") {
@@ -85,7 +98,7 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
 
         // --- Links: show only the text, hide brackets + URL ---
         if (name === "Link") {
-          if (!isRangeActive(state, node.from, node.to)) {
+          if (!isElementActive(state, node.from, node.to)) {
             const raw = slice(node.from, node.to);
             const m = /^\[([^\]]*)\]\([^)]*\)$/.exec(raw);
             if (m) {
@@ -101,7 +114,7 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
 
         // --- Images: replace the whole node with an <img> ---
         if (name === "Image") {
-          if (!isRangeActive(state, node.from, node.to)) {
+          if (!isElementActive(state, node.from, node.to)) {
             const raw = slice(node.from, node.to);
             const m = /^!\[([^\]]*)\]\(([^)\s]+)[^)]*\)$/.exec(raw);
             if (m && /^(https?:|data:)/.test(m[2])) {
@@ -113,26 +126,26 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
 
         // --- Horizontal rule ---
         if (name === "HorizontalRule") {
-          if (!isRangeActive(state, node.from, node.to)) {
+          if (!isElementActive(state, node.from, node.to)) {
             replaceWith(node.from, node.to, new HrWidget());
           }
           return;
         }
 
-        // --- Task list checkbox ---
+        // --- Task list checkbox (reveals only when the cursor is on the marker) ---
         if (name === "TaskMarker") {
-          if (!isRangeActive(state, node.from, node.to)) {
+          if (!isElementActive(state, node.from, node.to)) {
             const checked = /x/i.test(slice(node.from, node.to));
             replaceWith(node.from, node.to, new CheckboxWidget(checked, node.from, node.to));
           }
           return;
         }
 
-        // --- Bullet list marker -> glyph ---
+        // --- Bullet list marker -> glyph (stays a glyph while editing item text) ---
         if (name === "ListMark") {
           const markText = slice(node.from, node.to);
           if ((markText === "-" || markText === "*" || markText === "+") &&
-              !isRangeActive(state, node.from, node.to)) {
+              !isElementActive(state, node.from, node.to)) {
             replaceWith(node.from, node.to, new BulletWidget());
           }
           return;
@@ -150,7 +163,8 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
           return;
         }
         if (name === "QuoteMark") {
-          if (!isRangeActive(state, node.from, node.to)) {
+          // Line-level: showing '>' doesn't change the rendered quote styling.
+          if (!isLineActive(state, node.from, node.to)) {
             const after = slice(node.to, node.to + 1) === " " ? node.to + 1 : node.to;
             hide(node.from, after);
           }
