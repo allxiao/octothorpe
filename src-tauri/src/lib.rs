@@ -3,21 +3,13 @@ mod core;
 mod error;
 mod state;
 
-use tauri::Manager;
-
 use state::AppState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .setup(|app| {
-            let dir = app.path().app_data_dir().expect("resolve app data dir");
-            std::fs::create_dir_all(&dir).ok();
-            let db = core::index::db::open(&dir.join("index.sqlite")).expect("open index db");
-            app.manage(AppState::new(db));
-            Ok(())
-        })
+        .manage(AppState::new())
         .invoke_handler(tauri::generate_handler![
             commands::documents::read_file,
             commands::documents::write_file,
