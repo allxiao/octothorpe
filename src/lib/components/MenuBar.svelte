@@ -50,7 +50,7 @@
         <div class="sep"></div>
         <button
           role="menuitem"
-          disabled={!workspace.hasDoc || !workspace.dirty}
+          disabled={!workspace.hasDoc || (!workspace.dirty && !workspace.untitled)}
           onclick={() => run(() => workspace.save())}
         >
           Save<span class="key">Ctrl+S</span>
