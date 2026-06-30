@@ -27,6 +27,10 @@ class Workspace {
   activeView = $state<ViewId>("explorer");
 
   activeRelPath = $state<string | null>(null);
+  /** Absolute path when a file outside the open folder is being edited. */
+  standalonePath = $state<string | null>(null);
+  /** A new, never-saved buffer with no path on disk (standalone-editor mode). */
+  untitled = $state(false);
   content = $state<string>("");
   dirty = $state(false);
   status = $state<string>("");
@@ -42,15 +46,39 @@ class Workspace {
 
   #editor: EditorApi | null = null;
 
+  /** Whether any document (vault, standalone, or untitled) is open. */
+  get hasDoc(): boolean {
+    return this.activeRelPath !== null || this.standalonePath !== null || this.untitled;
+  }
+
+  /** Absolute path of the active document on disk, or null for an untitled buffer. */
+  get activeAbsPath(): string | null {
+    if (this.standalonePath) return this.standalonePath;
+    if (this.root && this.activeRelPath) {
+      const sep = this.root.includes("\\") ? "\\" : "/";
+      return this.root + sep + this.activeRelPath.replace(/\//g, sep);
+    }
+    return null;
+  }
+
   /** Display title for the active document (basename without extension). */
   get activeTitle(): string {
-    if (!this.activeRelPath) return "";
-    const base = this.activeRelPath.split("/").pop() ?? this.activeRelPath;
+    if (this.untitled) return "Untitled";
+    const p = this.activeRelPath ?? this.standalonePath;
+    if (!p) return "";
+    const base = p.split(/[\\/]/).pop() ?? p;
     return base.replace(/\.(md|markdown)$/i, "");
   }
 
   /** Absolute directory of the active document (for resolving relative images). */
   get baseDir(): string {
+    if (this.standalonePath) {
+      const i = Math.max(
+        this.standalonePath.lastIndexOf("\\"),
+        this.standalonePath.lastIndexOf("/"),
+      );
+      return i >= 0 ? this.standalonePath.slice(0, i) : "";
+    }
     if (!this.root || !this.activeRelPath) return "";
     const slash = this.activeRelPath.lastIndexOf("/");
     const folder = slash >= 0 ? this.activeRelPath.slice(0, slash) : "";
@@ -89,7 +117,10 @@ class Workspace {
     this.root = info.root;
     this.docCount = info.docCount;
     this.tagCount = info.tagCount;
+    void ipc.unwatchFile();
     this.activeRelPath = null;
+    this.standalonePath = null;
+    this.untitled = false;
     this.content = "";
     this.clearTagFilter();
     await this.refresh();
@@ -135,6 +166,9 @@ class Workspace {
   async openDoc(relPath: string) {
     try {
       const doc = await ipc.readDocument(relPath);
+      void ipc.unwatchFile();
+      this.standalonePath = null;
+      this.untitled = false;
       this.activeRelPath = relPath;
       this.content = doc.content;
       this.dirty = false;
@@ -144,12 +178,66 @@ class Workspace {
     }
   }
 
+  /** Open an arbitrary file: a vault doc when it lives inside the open folder,
+   *  otherwise a standalone (out-of-folder) document. */
+  async openFile() {
+    try {
+      const path = await ipc.pickMarkdownPath();
+      if (!path) return;
+      const doc = await ipc.openPath(path);
+      if (doc.relPath) {
+        await this.openDoc(doc.relPath);
+      } else {
+        this.openStandalone(path, doc.content);
+      }
+    } catch (e) {
+      this.status = `Open failed: ${e}`;
+    }
+  }
+
+  /** Show a file from outside the open folder as a standalone document. */
+  openStandalone(path: string, content: string) {
+    this.activeRelPath = null;
+    this.untitled = false;
+    this.standalonePath = path;
+    this.content = content;
+    this.dirty = false;
+    this.externalChanged = false;
+    void ipc.watchFile(path);
+  }
+
+  /** Open an empty, never-saved buffer (standalone-editor mode, no folder). */
+  openUntitled() {
+    void ipc.unwatchFile();
+    this.activeRelPath = null;
+    this.standalonePath = null;
+    this.untitled = true;
+    this.content = "";
+    this.dirty = false;
+    this.externalChanged = false;
+  }
+
   setContent(next: string) {
     this.content = next;
     this.dirty = true;
   }
 
   async save() {
+    if (this.untitled) {
+      await this.saveAs();
+      return;
+    }
+    if (this.standalonePath) {
+      try {
+        await ipc.writeFile(this.standalonePath, this.content);
+        this.dirty = false;
+        this.externalChanged = false;
+        this.status = "Saved";
+      } catch (e) {
+        this.status = `Save failed: ${e}`;
+      }
+      return;
+    }
     if (!this.activeRelPath) return;
     try {
       await ipc.writeDocument(this.activeRelPath, this.content);
@@ -162,6 +250,87 @@ class Workspace {
     }
   }
 
+  /** Save the active document to a chosen location and switch the editor to it. */
+  async saveAs() {
+    if (!this.hasDoc) return;
+    try {
+      const target = await ipc.pickSavePath(`${this.activeTitle || "Untitled"}.md`);
+      if (!target) return;
+      await ipc.writeFile(target, this.content);
+      const doc = await ipc.openPath(target);
+      if (doc.relPath) {
+        await this.refresh();
+        await this.openDoc(doc.relPath);
+      } else {
+        this.openStandalone(target, this.content);
+      }
+      this.dirty = false;
+      this.status = "Saved";
+    } catch (e) {
+      this.status = `Save As failed: ${e}`;
+    }
+  }
+
+  /** Delete the active document (after confirmation) and clear the editor. */
+  async deleteActive() {
+    const abs = this.activeAbsPath;
+    if (!abs) return; // untitled buffer — nothing on disk
+    try {
+      const ok = await ipc.confirmDelete(this.activeTitle || "this file");
+      if (!ok) return;
+      if (this.activeRelPath) {
+        await ipc.deleteDocument(this.activeRelPath);
+        this.closeDoc();
+        await this.refresh();
+      } else {
+        await ipc.deleteFile(abs);
+        this.closeDoc();
+      }
+      this.status = "Deleted";
+    } catch (e) {
+      this.status = `Delete failed: ${e}`;
+    }
+  }
+
+  /** Reload the active document from disk (vault or standalone). */
+  async reloadActive() {
+    if (this.activeRelPath) {
+      await this.openDoc(this.activeRelPath);
+    } else if (this.standalonePath) {
+      try {
+        this.content = await ipc.readFile(this.standalonePath);
+        this.dirty = false;
+        this.externalChanged = false;
+      } catch (e) {
+        this.status = `Reload failed: ${e}`;
+      }
+    }
+  }
+
+  /** Close the active document and clear the editor. */
+  closeDoc() {
+    void ipc.unwatchFile();
+    this.activeRelPath = null;
+    this.standalonePath = null;
+    this.untitled = false;
+    this.content = "";
+    this.dirty = false;
+    this.externalChanged = false;
+  }
+
+  /** New document. Dispatches by state: a vault note when a folder is open; an
+   *  untitled buffer when none is open and nothing is being edited; otherwise a
+   *  new window (so the current edit isn't lost). */
+  newFile() {
+    if (this.root) {
+      void this.newNote();
+    } else if (!this.hasDoc) {
+      this.openUntitled();
+    } else {
+      void ipc.newWindow(true);
+    }
+  }
+
   async newNote(folder = "") {
     try {
       const meta = await ipc.createDocument(folder, "Untitled");
@@ -169,6 +338,28 @@ class Workspace {
       await this.openDoc(meta.relPath);
     } catch (e) {
       this.status = `New note failed: ${e}`;
+    }
+  }
+
+  /** Show the OS's native file-properties dialog for the active document. */
+  async showProperties() {
+    const abs = this.activeAbsPath;
+    if (!abs) return;
+    try {
+      await ipc.showProperties(abs);
+    } catch (e) {
+      this.status = `Properties failed: ${e}`;
+    }
+  }
+
+  /** Reveal the active document in the OS file manager. */
+  async revealLocation() {
+    const abs = this.activeAbsPath;
+    if (!abs) return;
+    try {
+      await ipc.revealInDir(abs);
+    } catch (e) {
+      this.status = `Open file location failed: ${e}`;
     }
   }
 
@@ -214,6 +405,9 @@ class Workspace {
     await listen<{ updated?: string[]; removed?: string[] }>("vault://changed", (e) => {
       this.onVaultChanged(e.payload);
     });
+    await listen<{ path: string; removed?: boolean }>("file://changed", (e) => {
+      this.onFileChanged(e.payload);
+    });
   }
 
   onVaultChanged(payload: { updated?: string[]; removed?: string[] }) {
@@ -235,6 +429,23 @@ class Workspace {
         void this.openDoc(active); // silent reload
         this.status = "Reloaded (changed on disk)";
       }
+    }
+  }
+
+  /** A standalone (out-of-folder) file changed on disk. */
+  onFileChanged(payload: { path: string; removed?: boolean }) {
+    if (this.standalonePath !== payload.path) return;
+    if (payload.removed) {
+      this.closeDoc();
+      this.status = "File deleted on disk";
+      return;
+    }
+    if (this.dirty) {
+      this.externalChanged = true;
+      this.status = "Changed on disk — your unsaved edits are kept";
+    } else {
+      void this.reloadActive();
+      this.status = "Reloaded (changed on disk)";
     }
   }
 }

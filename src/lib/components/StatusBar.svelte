@@ -16,7 +16,7 @@
   </div>
   <div class="right">
     {#if workspace.status}<span class="item">{workspace.status}</span>{/if}
-    {#if workspace.activeRelPath}
+    {#if workspace.hasDoc}
       <span class="item">{workspace.activeTitle}{workspace.dirty ? " ●" : ""}</span>
     {/if}
   </div>

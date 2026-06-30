@@ -38,13 +38,13 @@
     <ActivityBar />
     <Sidebar />
     <div class="editor-area">
-      {#if workspace.activeRelPath}
+      {#if workspace.hasDoc}
         <main class="editor-pane">
           {#if workspace.externalChanged}
             <div class="ext-banner">
               <span>This note changed on disk while you have unsaved edits.</span>
               <span class="actions">
-                <button onclick={() => workspace.openDoc(workspace.activeRelPath!)}>
+                <button onclick={() => workspace.reloadActive()}>
                   Reload from disk
                 </button>
                 <button onclick={() => (workspace.externalChanged = false)}>Keep mine</button>
