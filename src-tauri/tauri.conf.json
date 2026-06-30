@@ -28,6 +28,11 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "publisher": "Menghua Xiao",
+    "category": "Productivity",
+    "copyright": "Copyright © 2026 Menghua Xiao",
+    "shortDescription": "A Typora-like Markdown editor with document management",
+    "longDescription": "typedown is a fast, local-first Markdown editor that renders while you type (Typora-style), with Bear-style inline tags, full-text search (including Chinese), and a vault-based document manager.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
