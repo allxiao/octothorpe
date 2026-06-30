@@ -3,6 +3,7 @@ import { open, save } from "@tauri-apps/plugin-dialog";
 import type {
   DocumentContent,
   DocumentMeta,
+  SearchHit,
   TagNode,
   TreeNode,
   VaultInfo,
@@ -24,6 +25,8 @@ export const getTagTree = () => invoke<TagNode[]>("get_tag_tree");
 export const listDocuments = () => invoke<DocumentMeta[]>("list_documents");
 export const documentsByTag = (tag: string) =>
   invoke<DocumentMeta[]>("documents_by_tag", { tag });
+export const search = (query: string, opts?: { tag?: string; limit?: number }) =>
+  invoke<SearchHit[]>("search", { query, tag: opts?.tag, limit: opts?.limit });
 export const readDocument = (relPath: string) =>
   invoke<DocumentContent>("read_document", { relPath });
 export const writeDocument = (relPath: string, content: string) =>

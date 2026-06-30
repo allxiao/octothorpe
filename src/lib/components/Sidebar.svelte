@@ -5,8 +5,9 @@
   import FileTree from "./FileTree.svelte";
   import TagTree from "./TagTree.svelte";
   import Outline from "./Outline.svelte";
+  import Search from "./Search.svelte";
 
-  const titles = { explorer: "Explorer", tags: "Tags", outline: "Outline" } as const;
+  const titles = { explorer: "Explorer", tags: "Tags", outline: "Outline", search: "Search" } as const;
 
   let notes = $derived(workspace.filterTag ? workspace.filteredDocs : workspace.allDocs);
   let notesTitle = $derived(workspace.filterTag ? `#${workspace.filterTag}` : "All Notes");
@@ -85,6 +86,8 @@
 
   {#if !workspace.root}
     <div class="hint">No vault open. Use <strong>File ▸ Open Vault</strong>.</div>
+  {:else if workspace.activeView === "search"}
+    <div class="search-wrap"><Search /></div>
   {:else}
     <div class="panels" bind:this={panelsEl}>
       {#each panels as p, i (p.id)}
@@ -166,6 +169,11 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+  }
+  .search-wrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
   }
   .notes {
     display: flex;

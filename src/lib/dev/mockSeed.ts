@@ -83,11 +83,32 @@ export function seedIfBrowser() {
 
   // Pick the view from the URL hash so screenshots can target each one.
   const hash = window.location.hash.replace("#", "");
-  if (hash === "tags" || hash === "explorer" || hash === "outline") {
+  if (["explorer", "tags", "outline", "search"].includes(hash)) {
     workspace.activeView = hash as ViewId;
   }
   if (hash === "tags") {
     workspace.filterTag = "recipes";
     workspace.filteredDocs = allDocs.filter((d) => d.tags.some((t) => t.startsWith("recipes")));
+  }
+  if (hash === "search") {
+    const S = String.fromCharCode(1);
+    const E = String.fromCharCode(2);
+    workspace.searchQuery = "preview";
+    workspace.searchResults = [
+      {
+        id: "Welcome.md",
+        relPath: "Welcome.md",
+        title: "Welcome to typedown",
+        snippet: `A markdown editor with live ${S}preview${E} and element-level reveal`,
+        score: -1.2,
+      },
+      {
+        id: "Projects/typedown.md",
+        relPath: "Projects/typedown.md",
+        title: "typedown",
+        snippet: `the live ${S}preview${E} layer renders while you type`,
+        score: -0.9,
+      },
+    ];
   }
 }

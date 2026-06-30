@@ -54,3 +54,15 @@ pub struct TagNode {
     pub count: i64,
     pub children: Vec<TagNode>,
 }
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchHit {
+    pub id: String,
+    pub rel_path: String,
+    pub title: String,
+    /// Body excerpt with matches wrapped in U+0001/U+0002 sentinels.
+    pub snippet: String,
+    /// bm25 relevance (lower is a better match).
+    pub score: f64,
+}

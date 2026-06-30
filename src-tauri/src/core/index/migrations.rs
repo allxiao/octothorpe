@@ -43,6 +43,12 @@ pub fn run(conn: &Connection) -> AppResult<()> {
             PRIMARY KEY (document_id, tag_id)
         );
         CREATE INDEX IF NOT EXISTS idx_doctags_tag ON document_tags(tag_id);
+
+        -- Full-text index. rowid is kept equal to documents.id; `body` holds the
+        -- document's plaintext (syntax stripped) so search matches prose.
+        CREATE VIRTUAL TABLE IF NOT EXISTS documents_fts USING fts5(
+            title, body, tokenize='unicode61 remove_diacritics 2'
+        );
         "#,
     )?;
     Ok(())

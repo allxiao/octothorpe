@@ -2,9 +2,9 @@
 // tag trees, the active document, the active sidebar view, and the tag filter.
 
 import * as ipc from "../ipc/commands";
-import type { DocumentMeta, TagNode, TreeNode } from "../ipc/types";
+import type { DocumentMeta, SearchHit, TagNode, TreeNode } from "../ipc/types";
 
-export type ViewId = "explorer" | "tags" | "outline";
+export type ViewId = "explorer" | "tags" | "outline" | "search";
 
 export interface OutlineItem {
   level: number;
@@ -33,6 +33,9 @@ class Workspace {
 
   filterTag = $state<string | null>(null);
   filteredDocs = $state<DocumentMeta[]>([]);
+
+  searchQuery = $state<string>("");
+  searchResults = $state<SearchHit[]>([]);
 
   #editor: EditorApi | null = null;
 
@@ -156,6 +159,21 @@ class Workspace {
   clearTagFilter() {
     this.filterTag = null;
     this.filteredDocs = [];
+  }
+
+  // --- search ---------------------------------------------------------------
+
+  async runSearch(q: string) {
+    this.searchQuery = q;
+    if (!q.trim() || !this.root) {
+      this.searchResults = [];
+      return;
+    }
+    try {
+      this.searchResults = await ipc.search(q);
+    } catch (e) {
+      this.status = `Search failed: ${e}`;
+    }
   }
 }
 

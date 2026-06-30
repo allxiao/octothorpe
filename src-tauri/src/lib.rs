@@ -18,6 +18,7 @@ pub fn run() {
             commands::vault::get_tag_tree,
             commands::vault::list_documents,
             commands::vault::documents_by_tag,
+            commands::vault::search,
             commands::vault::read_document,
             commands::vault::write_document,
             commands::vault::create_document,

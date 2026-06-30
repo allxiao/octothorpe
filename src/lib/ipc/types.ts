@@ -36,3 +36,12 @@ export interface TagNode {
   count: number;
   children: TagNode[];
 }
+
+export interface SearchHit {
+  id: string;
+  relPath: string;
+  title: string;
+  /** Body excerpt with matches wrapped in U+0001/U+0002 sentinels. */
+  snippet: string;
+  score: number;
+}

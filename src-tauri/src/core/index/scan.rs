@@ -20,6 +20,7 @@ pub fn rescan(conn: &mut Connection, vault: &Vault) -> AppResult<()> {
     tx.execute("DELETE FROM documents", [])?;
     tx.execute("DELETE FROM folders", [])?;
     tx.execute("DELETE FROM tags", [])?;
+    tx.execute("DELETE FROM documents_fts", [])?;
 
     for entry in WalkDir::new(&vault.root).into_iter().filter_map(Result::ok) {
         let path = entry.path();
@@ -58,7 +59,14 @@ pub fn reindex_one(conn: &mut Connection, vault: &Vault, rel: &str) -> AppResult
 
 /// Remove a document from the index (after its file is deleted).
 pub fn remove_one(conn: &mut Connection, rel: &str) -> AppResult<()> {
+    use rusqlite::OptionalExtension;
     let tx = conn.transaction()?;
+    let id: Option<i64> = tx
+        .query_row("SELECT id FROM documents WHERE rel_path = ?1", params![rel], |r| r.get(0))
+        .optional()?;
+    if let Some(id) = id {
+        tx.execute("DELETE FROM documents_fts WHERE rowid = ?1", params![id])?;
+    }
     tx.execute("DELETE FROM documents WHERE rel_path = ?1", params![rel])?;
     prune_tags(&tx)?;
     tx.commit()?;
@@ -76,10 +84,16 @@ fn index_file(tx: &Transaction, vault: &Vault, rel: &str) -> AppResult<()> {
         .or_else(|| file_name.strip_suffix(".md"))
         .unwrap_or(&file_name);
     let title = extract_title(&content, stem);
+    let body = crate::core::markdown::to_plaintext(&content);
 
+    // UPSERT keyed on rel_path so the document's id (and thus the FTS rowid) is
+    // stable across reindexes.
     tx.execute(
-        "INSERT OR REPLACE INTO documents (rel_path, folder, title, mtime, size, content_hash)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        "INSERT INTO documents (rel_path, folder, title, mtime, size, content_hash)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+         ON CONFLICT(rel_path) DO UPDATE SET
+             folder = excluded.folder, title = excluded.title, mtime = excluded.mtime,
+             size = excluded.size, content_hash = excluded.content_hash",
         params![
             rel,
             folder,
@@ -95,6 +109,7 @@ fn index_file(tx: &Transaction, vault: &Vault, rel: &str) -> AppResult<()> {
         })?;
 
     // Link the document to each as-written tag path it contains.
+    tx.execute("DELETE FROM document_tags WHERE document_id = ?1", params![doc_id])?;
     let leaf_tags: BTreeSet<String> = extract_tags(&content).into_iter().collect();
     for tag in leaf_tags {
         tx.execute("INSERT OR IGNORE INTO tags (path) VALUES (?1)", params![tag])?;
@@ -105,6 +120,13 @@ fn index_file(tx: &Transaction, vault: &Vault, rel: &str) -> AppResult<()> {
             params![doc_id, tag_id],
         )?;
     }
+
+    // Keep the full-text row (rowid == documents.id) in sync.
+    tx.execute("DELETE FROM documents_fts WHERE rowid = ?1", params![doc_id])?;
+    tx.execute(
+        "INSERT INTO documents_fts (rowid, title, body) VALUES (?1, ?2, ?3)",
+        params![doc_id, title, body],
+    )?;
     Ok(())
 }
 

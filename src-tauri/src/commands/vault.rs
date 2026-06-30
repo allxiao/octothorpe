@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use tauri::State;
 
 use crate::core::index::{db, query, scan};
-use crate::core::model::{DocumentContent, DocumentMeta, TagNode, TreeNode, VaultInfo};
+use crate::core::model::{DocumentContent, DocumentMeta, SearchHit, TagNode, TreeNode, VaultInfo};
 use crate::core::storage::document;
 use crate::core::vault::Vault;
 use crate::error::{AppError, AppResult};
@@ -63,6 +63,19 @@ pub fn list_documents(state: State<AppState>) -> AppResult<Vec<DocumentMeta>> {
 pub fn documents_by_tag(tag: String, state: State<AppState>) -> AppResult<Vec<DocumentMeta>> {
     let guard = state.db.lock().unwrap();
     query::documents_by_tag(guard.as_ref().ok_or_else(no_vault)?, &tag)
+}
+
+#[tauri::command]
+pub fn search(
+    query: String,
+    tag: Option<String>,
+    limit: Option<i64>,
+    state: State<AppState>,
+) -> AppResult<Vec<SearchHit>> {
+    let guard = state.db.lock().unwrap();
+    let db = guard.as_ref().ok_or_else(no_vault)?;
+    // `query` (param) shadows the module, so call it by its absolute path.
+    crate::core::index::query::search(db, &query, tag.as_deref(), limit)
 }
 
 #[tauri::command]

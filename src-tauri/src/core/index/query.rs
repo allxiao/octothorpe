@@ -5,10 +5,87 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use rusqlite::{params, Connection};
 
-use crate::core::model::{DocumentMeta, TagNode, TreeNode, VaultInfo};
+use crate::core::model::{DocumentMeta, SearchHit, TagNode, TreeNode, VaultInfo};
 use crate::core::tags::ancestor_paths;
 use crate::core::vault::split_parent;
 use crate::error::AppResult;
+
+/// Sentinels wrapping matched terms in snippets (kept out of normal text).
+const HL_START: &str = "\u{0001}";
+const HL_END: &str = "\u{0002}";
+
+/// Turn free-text input into a safe FTS5 query: each whitespace token becomes a
+/// quoted prefix term (implicit AND). Quoting avoids FTS5 syntax errors on
+/// arbitrary input.
+fn fts_query(input: &str) -> String {
+    input
+        .split_whitespace()
+        .map(|t| format!("\"{}\"*", t.replace('"', "\"\"")))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Full-text search over note bodies, ranked by bm25, optionally restricted to a
+/// tag subtree. Returns snippets with matches wrapped in HL sentinels.
+pub fn search(
+    conn: &Connection,
+    text: &str,
+    tag: Option<&str>,
+    limit: Option<i64>,
+) -> AppResult<Vec<SearchHit>> {
+    let match_q = fts_query(text);
+    if match_q.is_empty() {
+        return Ok(Vec::new());
+    }
+    let limit = limit.unwrap_or(50).clamp(1, 200);
+    let snippet = format!("snippet(documents_fts, 1, '{HL_START}', '{HL_END}', '…', 12)");
+
+    let map = |r: &rusqlite::Row| {
+        let rel: String = r.get(0)?;
+        Ok(SearchHit {
+            id: rel.clone(),
+            rel_path: rel,
+            title: r.get(1)?,
+            snippet: r.get(2)?,
+            score: r.get(3)?,
+        })
+    };
+
+    let hits = if let Some(tag) = tag {
+        let sql = format!(
+            "SELECT d.rel_path, d.title, {snippet}, bm25(documents_fts)
+             FROM documents_fts
+             JOIN documents d ON d.id = documents_fts.rowid
+             JOIN document_tags dt ON dt.document_id = d.id
+             JOIN tags t ON t.id = dt.tag_id
+             WHERE documents_fts MATCH ?1 AND (t.path = ?2 OR t.path LIKE ?3)
+             GROUP BY d.id
+             ORDER BY bm25(documents_fts)
+             LIMIT ?4"
+        );
+        let like = format!("{tag}/%");
+        let mut stmt = conn.prepare(&sql)?;
+        let rows: Vec<SearchHit> = stmt
+            .query_map(params![match_q, tag, like, limit], map)?
+            .collect::<Result<_, _>>()?;
+        rows
+    } else {
+        let sql = format!(
+            "SELECT d.rel_path, d.title, {snippet}, bm25(documents_fts)
+             FROM documents_fts
+             JOIN documents d ON d.id = documents_fts.rowid
+             WHERE documents_fts MATCH ?1
+             ORDER BY bm25(documents_fts)
+             LIMIT ?2"
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let rows: Vec<SearchHit> = stmt
+            .query_map(params![match_q, limit], map)?
+            .collect::<Result<_, _>>()?;
+        rows
+    };
+    Ok(hits)
+}
 
 pub fn vault_info(conn: &Connection, root: &str) -> AppResult<VaultInfo> {
     let count = |sql: &str| -> AppResult<i64> {
@@ -253,6 +330,34 @@ mod tests {
         let meta = document_meta(&conn, "notes/a.md").unwrap();
         assert_eq!(meta.title, "Alpha");
         assert_eq!(meta.tags, vec!["recipes/italian", "work"]);
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn full_text_search_matches_prose_with_snippets() {
+        let dir = std::env::temp_dir().join("typedown_search_test");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("a.md"), "# Risotto\n\nCreamy **risotto** with saffron.").unwrap();
+        std::fs::write(dir.join("b.md"), "# Salad\n\nGreen salad, no rice here.").unwrap();
+
+        let vault = Vault::new(dir.clone());
+        let mut conn = db::open_in_memory().unwrap();
+        scan::rescan(&mut conn, &vault).unwrap();
+
+        // Matches body prose (syntax stripped), not markdown punctuation.
+        let hits = search(&conn, "risotto", None, None).unwrap();
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].rel_path, "a.md");
+        assert!(hits[0].snippet.contains('\u{0001}')); // highlighted
+
+        // Prefix matching.
+        assert_eq!(search(&conn, "saff", None, None).unwrap().len(), 1);
+        // No match.
+        assert_eq!(search(&conn, "pizza", None, None).unwrap().len(), 0);
+        // Empty query -> no results, no error.
+        assert_eq!(search(&conn, "   ", None, None).unwrap().len(), 0);
 
         std::fs::remove_dir_all(&dir).ok();
     }
