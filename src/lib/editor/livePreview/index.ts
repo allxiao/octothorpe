@@ -69,8 +69,9 @@ const livePreviewTheme = EditorView.theme({
   ".cm-md-image-line .cm-widgetBuffer": { display: "none" },
   // Surrounded by text: flow inline, vertically centred with the text.
   ".cm-md-image-inline": { display: "inline-block", verticalAlign: "middle" },
-  // Live preview shown below the source while editing.
-  ".cm-md-image-preview": { display: "block", margin: "0.3em 0" },
+  // Live preview shown below the source while editing (centered to match the
+  // rendered block image, so clicking to edit doesn't shift it left).
+  ".cm-md-image-preview": { display: "block", margin: "0.3em auto" },
   ".cm-md-hr": {
     display: "inline-block",
     width: "100%",
