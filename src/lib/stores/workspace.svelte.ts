@@ -39,6 +39,27 @@ export interface EditorApi {
   insertTable: (cols: number, rows: number) => void;
 }
 
+export type PageWidth = "normal" | "medium" | "wide";
+
+function readPref(key: string, fallback: string): string {
+  try {
+    return localStorage.getItem(key) ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+function writePref(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // ignore (private mode, etc.)
+  }
+}
+function readPageWidth(): PageWidth {
+  const v = readPref("typedown:pageWidth", "normal");
+  return v === "medium" || v === "wide" ? v : "normal";
+}
+
 class Workspace {
   root = $state<string | null>(null);
   tree = $state<TreeNode[]>([]);
@@ -48,6 +69,22 @@ class Workspace {
   tagCount = $state(0);
 
   activeView = $state<ViewId>("explorer");
+
+  /** View preferences (persisted). */
+  pageWidth = $state<PageWidth>(readPageWidth());
+  sourceMode = $state(readPref("typedown:sourceMode", "false") === "true");
+
+  get pageWidthPx(): number {
+    return this.pageWidth === "wide" ? 1200 : this.pageWidth === "medium" ? 1024 : 860;
+  }
+  setPageWidth(w: PageWidth) {
+    this.pageWidth = w;
+    writePref("typedown:pageWidth", w);
+  }
+  toggleSourceMode() {
+    this.sourceMode = !this.sourceMode;
+    writePref("typedown:sourceMode", String(this.sourceMode));
+  }
 
   activeRelPath = $state<string | null>(null);
   /** Absolute path when a file outside the open folder is being edited. */

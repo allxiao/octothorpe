@@ -242,7 +242,7 @@
     line-height: 1.6;
   }
   .editor :global(.cm-content) {
-    max-width: 860px;
+    max-width: var(--editor-max-width, 860px);
     margin: 0 auto;
     padding: 24px 16px 40vh;
   }
