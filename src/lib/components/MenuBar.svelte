@@ -429,7 +429,7 @@
       <button
         class="tb-btn"
         class:active={workspace.pageWidth === "normal"}
-        title="Normal width (860px)"
+        title="Normal width"
         aria-label="Normal width"
         onclick={() => workspace.setPageWidth("normal")}
       >
@@ -441,7 +441,7 @@
       <button
         class="tb-btn"
         class:active={workspace.pageWidth === "medium"}
-        title="Medium width (1024px)"
+        title="Medium width"
         aria-label="Medium width"
         onclick={() => workspace.setPageWidth("medium")}
       >
@@ -453,7 +453,7 @@
       <button
         class="tb-btn"
         class:active={workspace.pageWidth === "wide"}
-        title="Wide width (1200px)"
+        title="Wide width"
         aria-label="Wide width"
         onclick={() => workspace.setPageWidth("wide")}
       >
