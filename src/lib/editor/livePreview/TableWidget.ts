@@ -15,6 +15,59 @@ import {
   type TableModel,
 } from "../commands/table";
 
+/** Structural / alignment operations a table can perform. */
+export type TableOp =
+  | "addRowAbove"
+  | "addRowBelow"
+  | "addColBefore"
+  | "addColAfter"
+  | "moveRowUp"
+  | "moveRowDown"
+  | "moveColLeft"
+  | "moveColRight"
+  | "deleteRow"
+  | "deleteCol"
+  | "prettify"
+  | "delete"
+  | "copy"
+  | "alignLeft"
+  | "alignCenter"
+  | "alignRight"
+  | "alignNone";
+
+// The most recently focused table, so the Paragraph → Table menu (which blurs
+// the cell when it opens) can still target it. Cleared when the caret lands in
+// normal editor text (see the focusin handler in index.ts).
+let activeTable: { from: number; run: (op: TableOp) => void } | null = null;
+export const getActiveTable = () => activeTable;
+export function clearActiveTable() {
+  activeTable = null;
+}
+export function runActiveTableOp(op: TableOp): boolean {
+  if (!activeTable) return false;
+  activeTable.run(op);
+  return true;
+}
+/** Map a Paragraph-menu command id to a table op and run it on the active table. */
+export function runActiveTableCommand(id: string): boolean {
+  const op = MENU_OPS[id];
+  return op ? runActiveTableOp(op) : false;
+}
+const MENU_OPS: Record<string, TableOp> = {
+  tableAddRowAbove: "addRowAbove",
+  tableAddRowBelow: "addRowBelow",
+  tableAddColBefore: "addColBefore",
+  tableAddColAfter: "addColAfter",
+  tableMoveRowUp: "moveRowUp",
+  tableMoveRowDown: "moveRowDown",
+  tableMoveColLeft: "moveColLeft",
+  tableMoveColRight: "moveColRight",
+  tableDeleteRow: "deleteRow",
+  tableDeleteCol: "deleteCol",
+  tablePrettify: "prettify",
+  tableDelete: "delete",
+};
+
 /** Text content of a contenteditable cell, normalized to a single line. */
 function cellText(el: HTMLElement): string {
   return (el.textContent ?? "").replace(/ /g, " ").replace(/\s*\n\s*/g, " ");
@@ -79,6 +132,12 @@ export class TableWidget extends WidgetType {
     return true;
   }
 
+  /** Current table range in the document (start is stable; end may shift after edits). */
+  private range(view: EditorView): { from: number; to: number } {
+    const cur = findTables(view.state, this.from, this.from).find((t) => t.from === this.from);
+    return { from: this.from, to: cur ? cur.to : this.to };
+  }
+
   toDOM(view: EditorView): HTMLElement {
     const model = parseTableText(this.md);
 
@@ -107,33 +166,59 @@ export class TableWidget extends WidgetType {
     });
     table.appendChild(tbody);
 
-    // --- toolbar ---
-    const apply = (fn: (m: TableModel) => void) => {
+    // All structural / alignment ops go through here, from the toolbar, the ⋮
+    // menu, and the Paragraph → Table menu (via the active-table controller).
+    const doOp = (op: TableOp) => {
+      if (op === "copy") {
+        void writeText(renderTableText(this.readModel(wrap))).catch(() => {});
+        return;
+      }
+      if (op === "delete") {
+        this.deleteTable(view);
+        return;
+      }
+      const { from, to } = this.range(view);
       const m = this.readModel(wrap);
-      fn(m);
-      view.dispatch({ changes: { from: this.from, to: this.to, insert: renderTableText(m) } });
+      switch (op) {
+        case "addRowAbove": modelAddRow(m, activeRow < 0 ? 0 : activeRow); break;
+        case "addRowBelow": modelAddRow(m, activeRow < 0 ? 0 : activeRow + 1); break;
+        case "addColBefore": modelAddCol(m, activeCol); break;
+        case "addColAfter": modelAddCol(m, activeCol + 1); break;
+        case "moveRowUp": modelMoveRow(m, activeRow, -1); break;
+        case "moveRowDown": modelMoveRow(m, activeRow, 1); break;
+        case "moveColLeft": modelMoveCol(m, activeCol, -1); break;
+        case "moveColRight": modelMoveCol(m, activeCol, 1); break;
+        case "deleteRow": modelDeleteRow(m, activeRow); break;
+        case "deleteCol": modelDeleteCol(m, activeCol); break;
+        case "alignLeft": modelSetAlign(m, activeCol, "left"); break;
+        case "alignCenter": modelSetAlign(m, activeCol, "center"); break;
+        case "alignRight": modelSetAlign(m, activeCol, "right"); break;
+        case "alignNone": modelSetAlign(m, activeCol, ""); break;
+        case "prettify": break; // just re-render with padding
+      }
+      view.dispatch({ changes: { from, to, insert: renderTableText(m, op === "prettify") } });
     };
 
+    // --- toolbar ---
     const toolbar = document.createElement("div");
     toolbar.className = "cm-md-table-toolbar";
 
     const left = document.createElement("div");
     left.className = "cm-md-tb-group";
     left.append(
-      tbButton(ICONS.grid, "Align default", () => apply((m) => modelSetAlign(m, activeCol, ""))),
-      tbButton(ICONS.alignLeft, "Align left", () => apply((m) => modelSetAlign(m, activeCol, "left"))),
-      tbButton(ICONS.alignCenter, "Align center", () => apply((m) => modelSetAlign(m, activeCol, "center"))),
-      tbButton(ICONS.alignRight, "Align right", () => apply((m) => modelSetAlign(m, activeCol, "right"))),
+      tbButton(ICONS.grid, "Align default", () => doOp("alignNone")),
+      tbButton(ICONS.alignLeft, "Align left", () => doOp("alignLeft")),
+      tbButton(ICONS.alignCenter, "Align center", () => doOp("alignCenter")),
+      tbButton(ICONS.alignRight, "Align right", () => doOp("alignRight")),
     );
 
     const right = document.createElement("div");
     right.className = "cm-md-tb-group";
 
-    // Options ⋮ menu
     const menu = document.createElement("div");
     menu.className = "cm-md-table-menu";
     menu.style.display = "none";
-    const addItem = (label: string, fn: (m: TableModel) => void) => {
+    const addItem = (label: string, op: TableOp) => {
       const it = document.createElement("button");
       it.type = "button";
       it.className = "cm-md-menu-item";
@@ -141,40 +226,30 @@ export class TableWidget extends WidgetType {
       it.addEventListener("mousedown", (e) => e.preventDefault());
       it.addEventListener("click", () => {
         menu.style.display = "none";
-        apply(fn);
+        doOp(op);
       });
       menu.appendChild(it);
     };
     const sep = () => menu.appendChild(document.createElement("div")).classList.add("cm-md-menu-sep");
-    addItem("Add Row Above", (m) => modelAddRow(m, activeRow < 0 ? 0 : activeRow));
-    addItem("Add Row Below", (m) => modelAddRow(m, activeRow < 0 ? 0 : activeRow + 1));
-    addItem("Add Column Before", (m) => modelAddCol(m, activeCol));
-    addItem("Add Column After", (m) => modelAddCol(m, activeCol + 1));
+    addItem("Add Row Above", "addRowAbove");
+    addItem("Add Row Below", "addRowBelow");
+    addItem("Add Column Before", "addColBefore");
+    addItem("Add Column After", "addColAfter");
     sep();
-    addItem("Move Row Up", (m) => modelMoveRow(m, activeRow, -1));
-    addItem("Move Row Down", (m) => modelMoveRow(m, activeRow, 1));
-    addItem("Move Column Left", (m) => modelMoveCol(m, activeCol, -1));
-    addItem("Move Column Right", (m) => modelMoveCol(m, activeCol, 1));
+    addItem("Move Row Up", "moveRowUp");
+    addItem("Move Row Down", "moveRowDown");
+    addItem("Move Column Left", "moveColLeft");
+    addItem("Move Column Right", "moveColRight");
     sep();
-    addItem("Delete Row", (m) => modelDeleteRow(m, activeRow));
-    addItem("Delete Column", (m) => modelDeleteCol(m, activeCol));
-
-    const copyItem = document.createElement("button");
-    copyItem.type = "button";
-    copyItem.className = "cm-md-menu-item";
-    copyItem.textContent = "Copy Table";
-    copyItem.addEventListener("mousedown", (e) => e.preventDefault());
-    copyItem.addEventListener("click", () => {
-      menu.style.display = "none";
-      void writeText(renderTableText(this.readModel(wrap))).catch(() => {});
-    });
+    addItem("Delete Row", "deleteRow");
+    addItem("Delete Column", "deleteCol");
     sep();
-    menu.appendChild(copyItem);
+    addItem("Copy Table", "copy");
 
     const optionsBtn = tbButton(ICONS.dots, "Options", () => {
       menu.style.display = menu.style.display === "none" ? "block" : "none";
     });
-    const deleteBtn = tbButton(ICONS.trash, "Delete table", () => this.deleteTable(view));
+    const deleteBtn = tbButton(ICONS.trash, "Delete table", () => doOp("delete"));
     right.append(optionsBtn, deleteBtn);
 
     toolbar.append(left, right, menu);
@@ -194,6 +269,7 @@ export class TableWidget extends WidgetType {
           ? -1
           : [...(tr.parentElement as HTMLElement).children].indexOf(tr);
       menu.style.display = "none";
+      activeTable = { from: this.from, run: doOp };
     });
     wrap.addEventListener("focusout", (e) => {
       if (!wrap.contains(e.relatedTarget as Node)) this.commit(view, wrap);
@@ -267,21 +343,18 @@ export class TableWidget extends WidgetType {
     }
   }
 
-  /** Move the caret to the line just above the table (committing cell edits first). */
   private exitUp(view: EditorView) {
     if (this.from === 0) return; // nothing above
     view.focus(); // blur cell → commit via focusout
     view.dispatch({ selection: { anchor: this.from - 1 }, scrollIntoView: true });
   }
 
-  /** Move the caret to the line just below the table (committing cell edits first). */
   private exitDown(view: EditorView) {
     view.focus(); // blur cell → commit via focusout
     const st = view.state;
-    const end = findTables(st, this.from, this.from).find((t) => t.from === this.from)?.to ?? this.to;
+    const end = this.range(view).to;
     const endLine = st.doc.lineAt(Math.min(end, st.doc.length));
-    const target =
-      endLine.number < st.doc.lines ? st.doc.line(endLine.number + 1).from : endLine.to;
+    const target = endLine.number < st.doc.lines ? st.doc.line(endLine.number + 1).from : endLine.to;
     view.dispatch({ selection: { anchor: target }, scrollIntoView: true });
   }
 
@@ -312,15 +385,17 @@ export class TableWidget extends WidgetType {
   }
 
   private deleteTable(view: EditorView) {
-    const to = Math.min(this.to + 1, view.state.doc.length); // swallow the trailing newline
-    view.dispatch({ changes: { from: this.from, to, insert: "" }, selection: { anchor: this.from } });
+    const { from, to } = this.range(view);
+    const end = Math.min(to + 1, view.state.doc.length); // swallow the trailing newline
+    view.dispatch({ changes: { from, to: end, insert: "" }, selection: { anchor: from } });
     view.focus();
   }
 
   commit(view: EditorView, wrap: HTMLElement) {
     const md2 = renderTableText(this.readModel(wrap));
     if (md2 !== this.md) {
-      view.dispatch({ changes: { from: this.from, to: this.to, insert: md2 } });
+      const { from, to } = this.range(view);
+      view.dispatch({ changes: { from, to, insert: md2 } });
     }
   }
 }

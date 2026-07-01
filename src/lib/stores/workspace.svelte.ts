@@ -4,6 +4,11 @@
 import * as ipc from "../ipc/commands";
 import type { DocumentMeta, SearchHit, TagNode, TreeNode } from "../ipc/types";
 import type { BlockState } from "../editor/commands";
+import {
+  getActiveTable,
+  runActiveTableCommand,
+  runActiveTableOp,
+} from "../editor/livePreview/TableWidget";
 
 export type ViewId = "explorer" | "tags" | "outline" | "search";
 
@@ -223,6 +228,17 @@ class Workspace {
     return this.#editor?.blockState() ?? null;
   }
 
+  /** Whether a rendered table is currently the target for table menu commands. */
+  hasActiveTable(): boolean {
+    return getActiveTable() != null;
+  }
+
+  /** Run a Paragraph → Table structural command against the active rendered
+   *  table, falling back to the caret-based command for raw tables. */
+  tableCommand(id: string) {
+    if (!runActiveTableCommand(id)) this.#editor?.runCommand(id);
+  }
+
   // --- insert-table dialog -------------------------------------------------
 
   insertTableOpen = $state(false);
@@ -239,6 +255,7 @@ class Workspace {
   }
 
   async copyTable() {
+    if (runActiveTableOp("copy")) return;
     try {
       const text = this.#editor?.tableText();
       if (text) await ipc.clipboardWriteText(text);

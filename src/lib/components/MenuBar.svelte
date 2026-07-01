@@ -236,6 +236,7 @@
     </button>
     {#if open === "paragraph"}
       {@const bs = workspace.blockState()}
+      {@const tbl = workspace.hasActiveTable()}
       <div class="dropdown" role="menu">
         {@render mi({ label: "Heading 1", act: pc("heading1"), key: "Ctrl+1", checked: bs?.heading === 1 })}
         {@render mi({ label: "Heading 2", act: pc("heading2"), key: "Ctrl+2", checked: bs?.heading === 2 })}
@@ -257,24 +258,24 @@
             <div class="dropdown submenu" role="menu">
               {@render mi({ label: "Insert Table", act: () => workspace.openInsertTable(), key: "Ctrl+T", inSub: true })}
               <div class="sep"></div>
-              {@render mi({ label: "Add Row Above", act: pc("tableAddRowAbove"), disabled: !bs?.inTable, inSub: true })}
-              {@render mi({ label: "Add Row Below", act: pc("tableAddRowBelow"), key: "Ctrl+Enter", disabled: !bs?.inTable, inSub: true })}
+              {@render mi({ label: "Add Row Above", act: () => workspace.tableCommand("tableAddRowAbove"), disabled: !bs?.inTable && !tbl, inSub: true })}
+              {@render mi({ label: "Add Row Below", act: () => workspace.tableCommand("tableAddRowBelow"), key: "Ctrl+Enter", disabled: !bs?.inTable && !tbl, inSub: true })}
               <div class="sep"></div>
-              {@render mi({ label: "Add Column Before", act: pc("tableAddColBefore"), disabled: !bs?.inTable, inSub: true })}
-              {@render mi({ label: "Add Column After", act: pc("tableAddColAfter"), disabled: !bs?.inTable, inSub: true })}
+              {@render mi({ label: "Add Column Before", act: () => workspace.tableCommand("tableAddColBefore"), disabled: !bs?.inTable && !tbl, inSub: true })}
+              {@render mi({ label: "Add Column After", act: () => workspace.tableCommand("tableAddColAfter"), disabled: !bs?.inTable && !tbl, inSub: true })}
               <div class="sep"></div>
-              {@render mi({ label: "Move Row Up", act: pc("tableMoveRowUp"), disabled: !bs?.inTable, inSub: true })}
-              {@render mi({ label: "Move Row Down", act: pc("tableMoveRowDown"), disabled: !bs?.inTable, inSub: true })}
-              {@render mi({ label: "Move Column Left", act: pc("tableMoveColLeft"), key: "Alt+←", disabled: !bs?.inTable, inSub: true })}
-              {@render mi({ label: "Move Column Right", act: pc("tableMoveColRight"), key: "Alt+→", disabled: !bs?.inTable, inSub: true })}
+              {@render mi({ label: "Move Row Up", act: () => workspace.tableCommand("tableMoveRowUp"), disabled: !bs?.inTable && !tbl, inSub: true })}
+              {@render mi({ label: "Move Row Down", act: () => workspace.tableCommand("tableMoveRowDown"), disabled: !bs?.inTable && !tbl, inSub: true })}
+              {@render mi({ label: "Move Column Left", act: () => workspace.tableCommand("tableMoveColLeft"), key: "Alt+←", disabled: !bs?.inTable && !tbl, inSub: true })}
+              {@render mi({ label: "Move Column Right", act: () => workspace.tableCommand("tableMoveColRight"), key: "Alt+→", disabled: !bs?.inTable && !tbl, inSub: true })}
               <div class="sep"></div>
-              {@render mi({ label: "Delete Row", act: pc("tableDeleteRow"), key: "Ctrl+Shift+Backspace", disabled: !bs?.inTable, inSub: true })}
-              {@render mi({ label: "Delete Column", act: pc("tableDeleteCol"), disabled: !bs?.inTable, inSub: true })}
+              {@render mi({ label: "Delete Row", act: () => workspace.tableCommand("tableDeleteRow"), key: "Ctrl+Shift+Backspace", disabled: !bs?.inTable && !tbl, inSub: true })}
+              {@render mi({ label: "Delete Column", act: () => workspace.tableCommand("tableDeleteCol"), disabled: !bs?.inTable && !tbl, inSub: true })}
               <div class="sep"></div>
-              {@render mi({ label: "Copy Table", act: () => workspace.copyTable(), disabled: !bs?.inTable, inSub: true })}
-              {@render mi({ label: "Prettify Source Code", act: pc("tablePrettify"), disabled: !bs?.inTable, inSub: true })}
+              {@render mi({ label: "Copy Table", act: () => workspace.copyTable(), disabled: !bs?.inTable && !tbl, inSub: true })}
+              {@render mi({ label: "Prettify Source Code", act: () => workspace.tableCommand("tablePrettify"), disabled: !bs?.inTable && !tbl, inSub: true })}
               <div class="sep"></div>
-              {@render mi({ label: "Delete Table", act: pc("tableDelete"), disabled: !bs?.inTable, inSub: true })}
+              {@render mi({ label: "Delete Table", act: () => workspace.tableCommand("tableDelete"), disabled: !bs?.inTable && !tbl, inSub: true })}
             </div>
           {/if}
         </div>

@@ -9,6 +9,7 @@ import type { Extension } from "@codemirror/state";
 import { buildDecorations } from "./build";
 import { onTagClick } from "./config";
 import { tableField } from "./tableField";
+import { clearActiveTable } from "./TableWidget";
 
 /**
  * Live-preview ViewPlugin. Rebuilds decorations on document, viewport, or
@@ -180,6 +181,12 @@ const tagClickHandler = EditorView.domEventHandlers({
     if (tag) {
       view.state.facet(onTagClick)?.(tag);
     }
+    return false;
+  },
+  // When the caret lands in normal editor text (not a table cell), forget the
+  // last-active table so the Paragraph → Table menu greys out again.
+  focusin(event) {
+    if ((event.target as HTMLElement)?.classList?.contains("cm-content")) clearActiveTable();
     return false;
   },
 });
