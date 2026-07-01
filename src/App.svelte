@@ -99,12 +99,14 @@
         </main>
       {:else}
         <div class="empty">
-          {#if workspace.root}
-            Select a note from the sidebar, or create one with <strong>New</strong>.
-          {:else}
-            Open a folder, or start a new document with <strong>New</strong> (Ctrl+N).
-            Your notes are plain <code>.md</code> files on disk.
-          {/if}
+          <p>
+            {#if workspace.root}
+              Select a note from the sidebar, or create one with <strong>New</strong>.
+            {:else}
+              Open a folder, or start a new document with <strong>New</strong> (Ctrl+N).
+              Your notes are plain <code>.md</code> files on disk.
+            {/if}
+          </p>
         </div>
       {/if}
     </div>
@@ -175,18 +177,20 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    text-align: center;
-    opacity: 0.6;
     padding: 24px;
-    line-height: 1.6;
   }
-  .empty strong {
-    margin: 0 0.12em;
+  .empty p {
+    margin: 0;
+    max-width: 32em;
+    text-align: center;
+    line-height: 1.7;
+    opacity: 0.6;
   }
   .empty code {
+    display: inline-block;
     background: var(--button-hover-bg);
-    padding: 2px 6px;
-    margin: 0 0.18em;
+    padding: 1px 6px;
+    margin: 0 0.1em;
     border-radius: 4px;
     font-size: 0.95em;
   }
