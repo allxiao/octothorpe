@@ -168,9 +168,28 @@ export class TableWidget extends WidgetType {
 
     // All structural / alignment ops go through here, from the toolbar, the ⋮
     // menu, and the Paragraph → Table menu (via the active-table controller).
+    const restoreFocus = () => {
+      requestAnimationFrame(() => {
+        const cur = findTables(view.state, this.from, this.from).find((t) => t.from === this.from);
+        if (!cur) return;
+        const node: Node = view.domAtPos(cur.from).node;
+        const el = node instanceof HTMLElement ? node : node.parentElement;
+        const container = el?.closest(".cm-md-table-wrap") ?? view.dom.querySelector(".cm-md-table-wrap");
+        if (!container) return;
+        const bodyRows = container.querySelectorAll("tbody tr");
+        const rowEl =
+          activeRow < 0
+            ? (container.querySelector("thead tr") as HTMLElement | null)
+            : (bodyRows[Math.min(activeRow, bodyRows.length - 1)] as HTMLElement | undefined) ?? null;
+        const cell = rowEl?.children[Math.min(activeCol, rowEl.children.length - 1)];
+        if (cell instanceof HTMLElement) caretToEnd(cell);
+      });
+    };
+
     const doOp = (op: TableOp) => {
       if (op === "copy") {
         void writeText(renderTableText(this.readModel(wrap))).catch(() => {});
+        restoreFocus();
         return;
       }
       if (op === "delete") {
@@ -197,6 +216,7 @@ export class TableWidget extends WidgetType {
         case "prettify": break; // just re-render with padding
       }
       view.dispatch({ changes: { from, to, insert: renderTableText(m, op === "prettify") } });
+      restoreFocus();
     };
 
     // --- toolbar ---
