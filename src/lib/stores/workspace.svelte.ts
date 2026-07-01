@@ -56,7 +56,7 @@ function writePref(key: string, value: string) {
   }
 }
 function readPageWidth(): PageWidth {
-  const v = readPref("typedown:pageWidth", "normal");
+  const v = readPref("octothorpe:pageWidth", "normal");
   return v === "medium" || v === "wide" ? v : "normal";
 }
 
@@ -72,18 +72,18 @@ class Workspace {
 
   /** View preferences (persisted). */
   pageWidth = $state<PageWidth>(readPageWidth());
-  sourceMode = $state(readPref("typedown:sourceMode", "false") === "true");
+  sourceMode = $state(readPref("octothorpe:sourceMode", "false") === "true");
 
   get pageWidthPx(): number {
     return this.pageWidth === "wide" ? 1200 : this.pageWidth === "medium" ? 1024 : 860;
   }
   setPageWidth(w: PageWidth) {
     this.pageWidth = w;
-    writePref("typedown:pageWidth", w);
+    writePref("octothorpe:pageWidth", w);
   }
   toggleSourceMode() {
     this.sourceMode = !this.sourceMode;
-    writePref("typedown:sourceMode", String(this.sourceMode));
+    writePref("octothorpe:sourceMode", String(this.sourceMode));
   }
 
   activeRelPath = $state<string | null>(null);
@@ -376,7 +376,7 @@ class Workspace {
     await this.refresh();
     this.status = "";
     try {
-      localStorage.setItem("typedown:lastVault", path);
+      localStorage.setItem("octothorpe:lastVault", path);
     } catch {
       // ignore (private mode, etc.)
     }
@@ -387,7 +387,7 @@ class Workspace {
     if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) return;
     let path: string | null = null;
     try {
-      path = localStorage.getItem("typedown:lastVault");
+      path = localStorage.getItem("octothorpe:lastVault");
     } catch {
       return;
     }

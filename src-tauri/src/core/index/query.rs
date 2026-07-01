@@ -327,7 +327,7 @@ mod tests {
 
     #[test]
     fn indexes_docs_folders_and_tag_hierarchy() {
-        let dir = std::env::temp_dir().join("typedown_index_test");
+        let dir = std::env::temp_dir().join("octothorpe_index_test");
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(dir.join("notes")).unwrap();
         std::fs::write(
@@ -365,7 +365,7 @@ mod tests {
 
     #[test]
     fn full_text_search_matches_prose_with_snippets() {
-        let dir = std::env::temp_dir().join("typedown_search_test");
+        let dir = std::env::temp_dir().join("octothorpe_search_test");
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(dir.join("a.md"), "# Risotto\n\nCreamy **risotto** with saffron.").unwrap();
@@ -393,7 +393,7 @@ mod tests {
 
     #[test]
     fn full_text_search_chinese() {
-        let dir = std::env::temp_dir().join("typedown_cjk_test");
+        let dir = std::env::temp_dir().join("octothorpe_cjk_test");
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(dir.join("a.md"), "# 笔记\n\n这是一个关于中文搜索的测试。").unwrap();

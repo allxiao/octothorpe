@@ -13,7 +13,7 @@ const tree: TreeNode[] = [
     name: "Projects",
     relPath: "Projects",
     children: [
-      { id: "Projects/typedown.md", kind: "doc", name: "typedown", relPath: "Projects/typedown.md", children: [] },
+      { id: "Projects/octothorpe.md", kind: "doc", name: "octothorpe", relPath: "Projects/octothorpe.md", children: [] },
       { id: "Projects/side-quest.md", kind: "doc", name: "Side project", relPath: "Projects/side-quest.md", children: [] },
     ],
   },
@@ -27,14 +27,14 @@ const tree: TreeNode[] = [
       { id: "Recipes/pasta.md", kind: "doc", name: "Pasta", relPath: "Recipes/pasta.md", children: [] },
     ],
   },
-  { id: "Welcome.md", kind: "doc", name: "Welcome to typedown", relPath: "Welcome.md", children: [] },
+  { id: "Welcome.md", kind: "doc", name: "Welcome to Octothorpe", relPath: "Welcome.md", children: [] },
 ];
 
 const leaf = (name: string, path: string, count: number): TagNode => ({ name, path, count, children: [] });
 const tags: TagNode[] = [
   leaf("dinner", "dinner", 2),
   leaf("getting-started", "getting-started", 1),
-  { name: "project", path: "project", count: 2, children: [leaf("side", "project/side", 1), leaf("typedown", "project/typedown", 1)] },
+  { name: "project", path: "project", count: 2, children: [leaf("side", "project/side", 1), leaf("octothorpe", "project/octothorpe", 1)] },
   { name: "recipes", path: "recipes", count: 2, children: [leaf("italian", "recipes/italian", 1), leaf("thai", "recipes/thai", 1)] },
   { name: "status", path: "status", count: 2, children: [leaf("active", "status/active", 1), leaf("idea", "status/idea", 1)] },
   leaf("welcome", "welcome", 1),
@@ -44,14 +44,14 @@ const doc = (relPath: string, title: string, folder: string, t: string[]): Docum
   id: relPath, relPath, title, folder, tags: t, mtime: 0, size: 0,
 });
 const allDocs: DocumentMeta[] = [
-  doc("Welcome.md", "Welcome to typedown", "", ["welcome", "getting-started"]),
-  doc("Projects/typedown.md", "typedown", "Projects", ["project/typedown", "status/active"]),
+  doc("Welcome.md", "Welcome to Octothorpe", "", ["welcome", "getting-started"]),
+  doc("Projects/octothorpe.md", "octothorpe", "Projects", ["project/octothorpe", "status/active"]),
   doc("Projects/side-quest.md", "Side project", "Projects", ["project/side", "status/idea"]),
   doc("Recipes/pasta.md", "Pasta", "Recipes", ["recipes/italian", "dinner"]),
   doc("Recipes/pad-thai.md", "Pad Thai", "Recipes", ["recipes/thai", "dinner"]),
 ];
 
-const welcome = `# Welcome to typedown
+const welcome = `# Welcome to Octothorpe
 
 A markdown editor that renders **while you type**. #welcome #getting-started
 
@@ -63,7 +63,7 @@ A markdown editor that renders **while you type**. #welcome #getting-started
 
 ## Tags
 
-Use Bear-style tags like #project/typedown and #my first note#.
+Use Bear-style tags like #project/octothorpe and #my first note#.
 
 > Tip: pick a view from the activity bar on the left.
 `;
@@ -72,7 +72,7 @@ export function seedIfBrowser() {
   const hasTauri = "__TAURI_INTERNALS__" in window;
   if (hasTauri) return;
 
-  workspace.root = "C:/Code/typedown-sample-vault";
+  workspace.root = "C:/Code/octothorpe-sample-vault";
   workspace.tree = tree;
   workspace.tags = tags;
   workspace.allDocs = allDocs;
@@ -98,14 +98,14 @@ export function seedIfBrowser() {
       {
         id: "Welcome.md",
         relPath: "Welcome.md",
-        title: "Welcome to typedown",
+        title: "Welcome to Octothorpe",
         snippet: `A markdown editor with live ${S}preview${E} and element-level reveal`,
         score: -1.2,
       },
       {
-        id: "Projects/typedown.md",
-        relPath: "Projects/typedown.md",
-        title: "typedown",
+        id: "Projects/octothorpe.md",
+        relPath: "Projects/octothorpe.md",
+        title: "octothorpe",
         snippet: `the live ${S}preview${E} layer renders while you type`,
         score: -0.9,
       },

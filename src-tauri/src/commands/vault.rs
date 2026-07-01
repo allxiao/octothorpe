@@ -1,5 +1,5 @@
 //! Vault-aware IPC: open a folder, browse the tree/tags, and read/write docs by
-//! their vault-relative id. The SQLite index lives in `<vault>/.typedown/` so it
+//! their vault-relative id. The SQLite index lives in `<vault>/.octothorpe/` so it
 //! is scoped to the vault. Write paths lock the vault (outer) then the db (inner)
 //! to keep a consistent lock order.
 
@@ -36,13 +36,13 @@ fn record_write(state: &AppState, rel: &str, abs: &Path) {
 pub fn open_vault(path: String, app: AppHandle, state: State<AppState>) -> AppResult<VaultInfo> {
     let root = PathBuf::from(&path);
 
-    // Vault-scoped index under <vault>/.typedown/ (a dot-dir, so it's skipped by
+    // Vault-scoped index under <vault>/.octothorpe/ (a dot-dir, so it's skipped by
     // the scanner). Drop a .gitignore so the index isn't committed.
-    let meta_dir = root.join(".typedown");
+    let meta_dir = root.join(".octothorpe");
     std::fs::create_dir_all(&meta_dir)?;
     let gitignore = meta_dir.join(".gitignore");
     if !gitignore.exists() {
-        std::fs::write(&gitignore, "# typedown index — not part of your notes\n*\n")?;
+        std::fs::write(&gitignore, "# octothorpe index — not part of your notes\n*\n")?;
     }
 
     let vault = Vault::new(root);

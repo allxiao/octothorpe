@@ -83,7 +83,7 @@ fn process(app: &AppHandle, paths: BTreeSet<PathBuf>) {
             Some(r) if !r.is_empty() => r,
             _ => continue,
         };
-        // Ignore dot-dirs (.typedown index, .git, ...).
+        // Ignore dot-dirs (.octothorpe index, .git, ...).
         if rel.split('/').any(|s| s.starts_with('.')) {
             continue;
         }
