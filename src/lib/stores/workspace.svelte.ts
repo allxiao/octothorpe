@@ -3,6 +3,7 @@
 
 import * as ipc from "../ipc/commands";
 import type { DocumentMeta, SearchHit, TagNode, TreeNode } from "../ipc/types";
+import type { BlockState } from "../editor/commands";
 
 export type ViewId = "explorer" | "tags" | "outline" | "search";
 
@@ -24,6 +25,10 @@ export interface EditorApi {
   selectionOrDoc: () => string;
   imageAtCursor: () => string | null;
   focus: () => void;
+  runCommand: (id: string) => void;
+  blockState: () => BlockState | null;
+  tableText: () => string | null;
+  codeText: () => string | null;
 }
 
 class Workspace {
@@ -206,6 +211,35 @@ class Workspace {
     } catch (e) {
       this.status = `Copy image failed: ${e}`;
     }
+  }
+
+  // --- paragraph menu ------------------------------------------------------
+
+  paragraphCommand(id: string) {
+    this.#editor?.runCommand(id);
+  }
+  blockState(): BlockState | null {
+    return this.#editor?.blockState() ?? null;
+  }
+
+  async copyTable() {
+    try {
+      const text = this.#editor?.tableText();
+      if (text) await ipc.clipboardWriteText(text);
+    } catch (e) {
+      this.status = `Copy table failed: ${e}`;
+    }
+    this.#editor?.focus();
+  }
+
+  async copyCodeContent() {
+    try {
+      const text = this.#editor?.codeText();
+      if (text) await ipc.clipboardWriteText(text);
+    } catch (e) {
+      this.status = `Copy code failed: ${e}`;
+    }
+    this.#editor?.focus();
   }
 
   // --- vault ---------------------------------------------------------------

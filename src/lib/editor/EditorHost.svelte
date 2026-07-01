@@ -7,6 +7,12 @@
   import { baseExtensions } from "./setup";
   import { imageBaseDir, onTagClick } from "./livePreview/config";
   import { resolveImageFsPath } from "./livePreview/build";
+  import {
+    COMMANDS,
+    blockState as computeBlockState,
+    tableText as computeTableText,
+    codeText as computeCodeText,
+  } from "./commands";
   import type { EditorApi } from "../stores/workspace.svelte";
 
   let {
@@ -116,6 +122,11 @@
     view?.focus();
   }
 
+  function runCommand(id: string) {
+    const cmd = COMMANDS[id];
+    if (cmd && view) cmd(view);
+  }
+
   onMount(() => {
     const state = EditorState.create({
       doc: content,
@@ -144,6 +155,10 @@
       selectionOrDoc,
       imageAtCursor,
       focus: focusEditor,
+      runCommand,
+      blockState: () => (view ? computeBlockState(view.state) : null),
+      tableText: () => (view ? computeTableText(view.state) : null),
+      codeText: () => (view ? computeCodeText(view.state) : null),
     });
     // Dev-only hook so the live preview can be driven/inspected in a browser.
     if (import.meta.env.DEV) {

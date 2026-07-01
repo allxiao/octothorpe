@@ -6,6 +6,35 @@ import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from "@cod
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
 import { markdownLang } from "./markdownLang";
 import { livePreview } from "./livePreview";
+import { COMMANDS } from "./commands";
+
+// Paragraph-menu keybindings (editor-scoped). Placed before defaultKeymap so
+// list Indent/Outdent override CodeMirror's Mod-]/Mod-[.
+const PARAGRAPH_KEYS: { key: string; id: string }[] = [
+  { key: "Mod-1", id: "heading1" },
+  { key: "Mod-2", id: "heading2" },
+  { key: "Mod-3", id: "heading3" },
+  { key: "Mod-4", id: "heading4" },
+  { key: "Mod-5", id: "heading5" },
+  { key: "Mod-6", id: "heading6" },
+  { key: "Mod-0", id: "paragraph" },
+  { key: "Mod-=", id: "headingIncrease" },
+  { key: "Mod--", id: "headingDecrease" },
+  { key: "Mod-Shift-m", id: "mathBlock" },
+  { key: "Mod-Shift-k", id: "codeFence" },
+  { key: "Mod-Shift-q", id: "quote" },
+  { key: "Mod-Shift-[", id: "listOrdered" },
+  { key: "Mod-Shift-]", id: "listUnordered" },
+  { key: "Mod-Shift-x", id: "listTask" },
+  { key: "Mod-]", id: "indent" },
+  { key: "Mod-[", id: "outdent" },
+];
+
+const paragraphKeymap = PARAGRAPH_KEYS.map(({ key, id }) => ({
+  key,
+  preventDefault: true,
+  run: (view: EditorView) => COMMANDS[id](view),
+}));
 
 /**
  * Base CodeMirror extensions shared by the editor. The live-preview decoration
@@ -34,6 +63,7 @@ export function baseExtensions(onSave?: () => void): Extension[] {
         },
       },
       indentWithTab,
+      ...paragraphKeymap,
       ...defaultKeymap,
       ...historyKeymap,
       ...searchKeymap,
