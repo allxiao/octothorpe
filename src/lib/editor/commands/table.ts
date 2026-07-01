@@ -215,6 +215,48 @@ export function renderTableText(model: TableModel, pretty = false): string {
   return (pretty ? renderPretty(model) : render(model)).join("\n");
 }
 
+// --- pure model mutations (used by the WYSIWYG table toolbar) --------------
+
+const clampIndex = (i: number, len: number) => Math.max(0, Math.min(i, len));
+
+export function modelAddRow(m: TableModel, at: number) {
+  m.rows.splice(clampIndex(at, m.rows.length), 0, Array(m.header.length).fill(""));
+}
+export function modelAddCol(m: TableModel, at: number) {
+  const i = clampIndex(at, m.header.length);
+  m.header.splice(i, 0, "");
+  m.align.splice(i, 0, "");
+  m.rows.forEach((r) => r.splice(i, 0, ""));
+}
+export function modelDeleteRow(m: TableModel, at: number) {
+  if (at >= 0 && at < m.rows.length) m.rows.splice(at, 1);
+}
+export function modelDeleteCol(m: TableModel, at: number) {
+  if (m.header.length > 1 && at >= 0 && at < m.header.length) {
+    m.header.splice(at, 1);
+    m.align.splice(at, 1);
+    m.rows.forEach((r) => r.splice(at, 1));
+  }
+}
+export function modelMoveRow(m: TableModel, at: number, dir: -1 | 1) {
+  const j = at + dir;
+  if (at >= 0 && at < m.rows.length && j >= 0 && j < m.rows.length) {
+    [m.rows[at], m.rows[j]] = [m.rows[j], m.rows[at]];
+  }
+}
+export function modelMoveCol(m: TableModel, at: number, dir: -1 | 1) {
+  const j = at + dir;
+  if (at >= 0 && at < m.header.length && j >= 0 && j < m.header.length) {
+    const swap = (a: unknown[]) => ([a[at], a[j]] = [a[j], a[at]]);
+    swap(m.header);
+    swap(m.align);
+    m.rows.forEach(swap);
+  }
+}
+export function modelSetAlign(m: TableModel, col: number, a: Align) {
+  if (col >= 0 && col < m.align.length) m.align[col] = a;
+}
+
 /** Find every table block overlapping the line range [from, to] (document positions). */
 export function findTables(
   state: EditorState,
@@ -400,6 +442,16 @@ export function tableDelete(view: EditorView): boolean {
   return true;
 }
 
+/** Focus the first cell of the table at `tableFrom` (after its DOM renders). */
+export function focusTableCell(view: EditorView, tableFrom: number, selector: string) {
+  requestAnimationFrame(() => {
+    const node: Node = view.domAtPos(tableFrom).node;
+    const el = node instanceof HTMLElement ? node : node.parentElement;
+    const wrap = el?.closest(".cm-md-table-wrap") ?? view.dom.querySelector(".cm-md-table-wrap");
+    (wrap?.querySelector(selector) as HTMLElement | null)?.focus();
+  });
+}
+
 /**
  * Enter on a lone pipe-row header (`|a|b|`) completes it into a table by adding a
  * delimiter row and an empty body row. Returns false (normal Enter) otherwise.
@@ -419,11 +471,16 @@ export function autoTable(view: EditorView): boolean {
   const cols = Math.max(1, parseRow(text).length);
   const delim = "|" + " --- |".repeat(cols);
   const body = "|" + "  |".repeat(cols);
+  // Keep a blank line after the table so the caret has a home outside the widget.
+  const atEnd = line.to === state.doc.length;
+  const insert = "\n" + delim + "\n" + body + (atEnd ? "\n" : "");
+  const newLen = state.doc.length + insert.length;
+  const anchor = Math.min(line.to + insert.length + (atEnd ? 0 : 1), newLen);
   view.dispatch({
-    changes: { from: line.to, insert: "\n" + delim + "\n" + body },
-    selection: { anchor: line.to + 1 + delim.length + 1 + 2 },
+    changes: { from: line.to, insert },
+    selection: { anchor },
     scrollIntoView: true,
   });
-  view.focus();
+  focusTableCell(view, line.from, "tbody td");
   return true;
 }

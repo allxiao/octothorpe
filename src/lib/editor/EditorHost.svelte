@@ -14,6 +14,7 @@
     codeText as computeCodeText,
     tableSkeleton,
   } from "./commands";
+  import { focusTableCell } from "./commands/table";
   import type { EditorApi } from "../stores/workspace.svelte";
 
   let {
@@ -139,15 +140,21 @@
   function insertTable(cols: number, rows: number) {
     if (!view) return;
     const { state } = view;
-    const line = state.doc.lineAt(state.selection.main.head);
-    const prefix = line.text.trim() === "" ? "" : "\n\n";
     const sel = state.selection.main;
+    const line = state.doc.lineAt(sel.head);
+    const prefix = line.text.trim() === "" ? "" : "\n\n";
+    const skeleton = prefix + tableSkeleton(cols, rows);
+    const atEnd = sel.to === state.doc.length;
+    const insert = skeleton + (atEnd ? "\n" : "");
+    // Leave the caret on the line after the table (outside the block widget).
+    const anchor = Math.min(sel.from + skeleton.length + 1, sel.from + insert.length);
     view.dispatch({
-      changes: { from: sel.from, to: sel.to, insert: prefix + tableSkeleton(cols, rows) },
-      selection: { anchor: sel.from + prefix.length + 1 },
+      changes: { from: sel.from, to: sel.to, insert },
+      selection: { anchor },
       scrollIntoView: true,
     });
     view.focus();
+    focusTableCell(view, sel.from + prefix.length, "thead th");
   }
 
   onMount(() => {
