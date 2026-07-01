@@ -364,6 +364,45 @@
   <div class="menu">
     <button
       class="menu-title"
+      class:active={open === "format"}
+      onclick={() => toggle("format")}
+      onmouseenter={() => hover("format")}
+    >
+      Format
+    </button>
+    {#if open === "format"}
+      {@const is = workspace.inlineState()}
+      <div class="dropdown" role="menu">
+        {@render mi({ label: "Strong", act: pc("toggleBold"), key: "Ctrl+B", checked: is?.bold })}
+        {@render mi({ label: "Emphasis", act: pc("toggleItalic"), key: "Ctrl+I", checked: is?.italic })}
+        {@render mi({ label: "Underline", act: pc("toggleUnderline"), key: "Ctrl+U" })}
+        {@render mi({ label: "Code", act: pc("toggleCode"), key: "Ctrl+Shift+`", checked: is?.code })}
+        <div class="sep"></div>
+        {@render mi({ label: "Inline Math", act: pc("toggleMath") })}
+        {@render mi({ label: "Strike", act: pc("toggleStrike"), key: "Alt+Shift+5", checked: is?.strike })}
+        {@render mi({ label: "Comment", act: pc("toggleComment") })}
+        <div class="sep"></div>
+        {@render mi({ label: "Hyperlink", act: pc("toggleLink"), key: "Ctrl+K", checked: is?.link })}
+        <div class="submenu-anchor">
+          <button class="mi has-sub" role="menuitem" onmouseenter={() => (sub = "hyperlink")}>
+            <span class="check"></span><span class="lbl">Hyperlink Actions</span><span class="arrow">›</span>
+          </button>
+          {#if sub === "hyperlink"}
+            <div class="dropdown submenu" role="menu">
+              {@render mi({ label: "Open Link", act: () => workspace.openLink(), disabled: !is?.link, inSub: true })}
+              {@render mi({ label: "Copy Link Address", act: () => workspace.copyLinkAddress(), disabled: !is?.link, inSub: true })}
+            </div>
+          {/if}
+        </div>
+        <div class="sep"></div>
+        {@render mi({ label: "Clear Format", act: pc("clearFormat"), key: "Ctrl+\\" })}
+      </div>
+    {/if}
+  </div>
+
+  <div class="menu">
+    <button
+      class="menu-title"
       class:active={open === "view"}
       onclick={() => toggle("view")}
       onmouseenter={() => hover("view")}
