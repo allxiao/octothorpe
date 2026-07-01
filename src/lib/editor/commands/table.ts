@@ -452,6 +452,45 @@ export function focusTableCell(view: EditorView, tableFrom: number, selector: st
   });
 }
 
+/** Focus a cell in the (already-rendered) table at `tableFrom`. */
+function focusTableEdge(view: EditorView, tableFrom: number, edge: "first" | "last"): boolean {
+  const node: Node = view.domAtPos(tableFrom).node;
+  const el = node instanceof HTMLElement ? node : node.parentElement;
+  const wrap = el?.closest(".cm-md-table-wrap") ?? view.dom.querySelector(".cm-md-table-wrap");
+  const selector = edge === "first" ? "thead th" : "tbody tr:last-child td";
+  const cell = wrap?.querySelector(selector);
+  if (!(cell instanceof HTMLElement)) return false;
+  cell.focus();
+  return true;
+}
+
+const tableAt = (state: EditorState, line: { from: number; to: number }) =>
+  findTables(state, line.from, line.to).find((t) => line.from >= t.from && line.to <= t.to);
+
+/** ArrowUp on the line just below a table steps into its last row instead of skipping over. */
+export function enterTableUp(view: EditorView): boolean {
+  const { state } = view;
+  const sel = state.selection.main;
+  if (!sel.empty) return false;
+  const cur = state.doc.lineAt(sel.head);
+  if (cur.number === 1) return false;
+  if (state.doc.lineAt(view.moveVertically(sel, false).head).number === cur.number) return false;
+  const prev = state.doc.line(cur.number - 1);
+  return tableAt(state, prev) ? focusTableEdge(view, prev.from, "last") : false;
+}
+
+/** ArrowDown on the line just above a table steps into its header row instead of skipping over. */
+export function enterTableDown(view: EditorView): boolean {
+  const { state } = view;
+  const sel = state.selection.main;
+  if (!sel.empty) return false;
+  const cur = state.doc.lineAt(sel.head);
+  if (cur.number === state.doc.lines) return false;
+  if (state.doc.lineAt(view.moveVertically(sel, true).head).number === cur.number) return false;
+  const next = state.doc.line(cur.number + 1);
+  return tableAt(state, next) ? focusTableEdge(view, next.from, "first") : false;
+}
+
 /**
  * Enter on a lone pipe-row header (`|a|b|`) completes it into a table by adding a
  * delimiter row and an empty body row. Returns false (normal Enter) otherwise.

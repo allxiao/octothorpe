@@ -3,6 +3,7 @@ import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import {
   parseTableText,
   renderTableText,
+  findTables,
   modelAddRow,
   modelAddCol,
   modelDeleteRow,
@@ -240,7 +241,48 @@ export class TableWidget extends WidgetType {
       e.preventDefault();
       cell.blur();
       view.focus();
+      return;
     }
+
+    if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+      const tr = cell.parentElement as HTMLElement;
+      const col = [...tr.children].indexOf(cell);
+      const inHead = (tr.parentElement as HTMLElement).tagName === "THEAD";
+      const focusInRow = (row: HTMLElement | null) => {
+        if (!row) return;
+        caretToEnd(row.children[Math.min(col, row.children.length - 1)] as HTMLElement);
+      };
+      e.preventDefault();
+      if (e.key === "ArrowUp") {
+        if (inHead) this.exitUp(view);
+        else focusInRow((tr.previousElementSibling as HTMLElement) ?? wrap.querySelector("thead tr"));
+      } else {
+        if (inHead) focusInRow(wrap.querySelector("tbody tr"));
+        else {
+          const next = tr.nextElementSibling as HTMLElement | null;
+          if (next) focusInRow(next);
+          else this.exitDown(view);
+        }
+      }
+    }
+  }
+
+  /** Move the caret to the line just above the table (committing cell edits first). */
+  private exitUp(view: EditorView) {
+    if (this.from === 0) return; // nothing above
+    view.focus(); // blur cell → commit via focusout
+    view.dispatch({ selection: { anchor: this.from - 1 }, scrollIntoView: true });
+  }
+
+  /** Move the caret to the line just below the table (committing cell edits first). */
+  private exitDown(view: EditorView) {
+    view.focus(); // blur cell → commit via focusout
+    const st = view.state;
+    const end = findTables(st, this.from, this.from).find((t) => t.from === this.from)?.to ?? this.to;
+    const endLine = st.doc.lineAt(Math.min(end, st.doc.length));
+    const target =
+      endLine.number < st.doc.lines ? st.doc.line(endLine.number + 1).from : endLine.to;
+    view.dispatch({ selection: { anchor: target }, scrollIntoView: true });
   }
 
   private appendRow(wrap: HTMLElement): HTMLElement {

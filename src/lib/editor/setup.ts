@@ -7,7 +7,7 @@ import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
 import { markdownLang } from "./markdownLang";
 import { livePreview } from "./livePreview";
 import { COMMANDS } from "./commands";
-import { autoTable } from "./commands/table";
+import { autoTable, enterTableUp, enterTableDown } from "./commands/table";
 
 // Paragraph-menu keybindings (editor-scoped). Placed before defaultKeymap so
 // list Indent/Outdent override CodeMirror's Mod-]/Mod-[.
@@ -80,6 +80,8 @@ export function baseExtensions(onSave?: () => void): Extension[] {
       },
       indentWithTab,
       { key: "Enter", run: autoTable },
+      { key: "ArrowUp", run: enterTableUp },
+      { key: "ArrowDown", run: enterTableDown },
       ...paragraphKeymap,
       ...tableKeymap,
       ...defaultKeymap,
