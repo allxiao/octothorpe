@@ -423,6 +423,67 @@
       </div>
     {/if}
   </div>
+
+  <div class="toolbar">
+    <div class="tb-group" role="group" aria-label="Page width">
+      <button
+        class="tb-btn"
+        class:active={workspace.pageWidth === "normal"}
+        title="Normal width (860px)"
+        aria-label="Normal width"
+        onclick={() => workspace.setPageWidth("normal")}
+      >
+        <svg viewBox="0 0 22 16">
+          <rect x="1.5" y="2" width="19" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.2" />
+          <rect x="8" y="5" width="6" height="6" rx="1" fill="currentColor" />
+        </svg>
+      </button>
+      <button
+        class="tb-btn"
+        class:active={workspace.pageWidth === "medium"}
+        title="Medium width (1024px)"
+        aria-label="Medium width"
+        onclick={() => workspace.setPageWidth("medium")}
+      >
+        <svg viewBox="0 0 22 16">
+          <rect x="1.5" y="2" width="19" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.2" />
+          <rect x="6" y="5" width="10" height="6" rx="1" fill="currentColor" />
+        </svg>
+      </button>
+      <button
+        class="tb-btn"
+        class:active={workspace.pageWidth === "wide"}
+        title="Wide width (1200px)"
+        aria-label="Wide width"
+        onclick={() => workspace.setPageWidth("wide")}
+      >
+        <svg viewBox="0 0 22 16">
+          <rect x="1.5" y="2" width="19" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.2" />
+          <rect x="4" y="5" width="14" height="6" rx="1" fill="currentColor" />
+        </svg>
+      </button>
+    </div>
+    <div class="tb-group" role="group" aria-label="Source code mode">
+      <button
+        class="tb-btn"
+        class:active={workspace.sourceMode}
+        title="Source code mode"
+        aria-label="Source code mode"
+        onclick={() => workspace.toggleSourceMode()}
+      >
+        <svg viewBox="0 0 22 16">
+          <path
+            d="M8 4 L4 8 L8 12 M14 4 L18 8 L14 12"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.4"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+      </button>
+    </div>
+  </div>
 </div>
 
 <style>
@@ -435,6 +496,41 @@
     flex: 0 0 auto;
     -webkit-user-select: none;
     user-select: none;
+  }
+  .toolbar {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 8px;
+  }
+  .tb-group {
+    display: flex;
+    gap: 1px;
+  }
+  .tb-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 22px;
+    padding: 0;
+    border: none;
+    background: none;
+    color: inherit;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .tb-btn:hover {
+    background: var(--button-hover-bg);
+  }
+  .tb-btn.active {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+  .tb-btn svg {
+    width: 17px;
+    height: 13px;
   }
   .menu {
     position: relative;
