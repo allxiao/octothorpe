@@ -3,22 +3,60 @@
   import * as ipc from "../ipc/commands";
 
   let open = $state<string | null>(null);
+  let sub = $state<string | null>(null);
 
   function toggle(menu: string) {
     open = open === menu ? null : menu;
+    sub = null;
   }
   function hover(menu: string) {
-    if (open) open = menu;
+    if (open) {
+      open = menu;
+      sub = null;
+    }
   }
   function run(fn: () => void) {
     open = null;
+    sub = null;
     fn();
+  }
+
+  /** A paragraph command as a menu action. */
+  const pc = (id: string) => () => workspace.paragraphCommand(id);
+
+  interface MI {
+    label: string;
+    act: () => void;
+    key?: string;
+    checked?: boolean;
+    disabled?: boolean;
+    /** true for items inside a submenu (so hovering them keeps it open). */
+    inSub?: boolean;
   }
 </script>
 
+{#snippet mi(o: MI)}
+  <button
+    class="mi"
+    role="menuitem"
+    disabled={o.disabled}
+    onmouseenter={() => {
+      if (!o.inSub) sub = null;
+    }}
+    onclick={() => run(o.act)}
+  >
+    <span class="check">{o.checked ? "✓" : ""}</span>
+    <span class="lbl">{o.label}</span>
+    {#if o.key}<span class="key">{o.key}</span>{/if}
+  </button>
+{/snippet}
+
 <svelte:window
   onclick={(e) => {
-    if (!(e.target as HTMLElement).closest(".menubar")) open = null;
+    if (!(e.target as HTMLElement).closest(".menubar")) {
+      open = null;
+      sub = null;
+    }
   }}
 />
 
@@ -190,6 +228,141 @@
   <div class="menu">
     <button
       class="menu-title"
+      class:active={open === "paragraph"}
+      onclick={() => toggle("paragraph")}
+      onmouseenter={() => hover("paragraph")}
+    >
+      Paragraph
+    </button>
+    {#if open === "paragraph"}
+      {@const bs = workspace.blockState()}
+      <div class="dropdown" role="menu">
+        {@render mi({ label: "Heading 1", act: pc("heading1"), key: "Ctrl+1", checked: bs?.heading === 1 })}
+        {@render mi({ label: "Heading 2", act: pc("heading2"), key: "Ctrl+2", checked: bs?.heading === 2 })}
+        {@render mi({ label: "Heading 3", act: pc("heading3"), key: "Ctrl+3", checked: bs?.heading === 3 })}
+        {@render mi({ label: "Heading 4", act: pc("heading4"), key: "Ctrl+4", checked: bs?.heading === 4 })}
+        {@render mi({ label: "Heading 5", act: pc("heading5"), key: "Ctrl+5", checked: bs?.heading === 5 })}
+        {@render mi({ label: "Heading 6", act: pc("heading6"), key: "Ctrl+6", checked: bs?.heading === 6 })}
+        {@render mi({ label: "Paragraph", act: pc("paragraph"), key: "Ctrl+0", checked: bs ? bs.heading === 0 : false })}
+        <div class="sep"></div>
+        {@render mi({ label: "Increase Heading Level", act: pc("headingIncrease"), key: "Ctrl+=" })}
+        {@render mi({ label: "Decrease Heading Level", act: pc("headingDecrease"), key: "Ctrl+-" })}
+        <div class="sep"></div>
+
+        <div class="submenu-anchor">
+          <button class="mi has-sub" role="menuitem" onmouseenter={() => (sub = "table")}>
+            <span class="check"></span><span class="lbl">Table</span><span class="arrow">›</span>
+          </button>
+          {#if sub === "table"}
+            <div class="dropdown submenu" role="menu">
+              {@render mi({ label: "Insert Table", act: pc("tableInsert"), key: "Ctrl+T", inSub: true })}
+              <div class="sep"></div>
+              {@render mi({ label: "Add Row Above", act: pc("tableAddRowAbove"), disabled: !bs?.inTable, inSub: true })}
+              {@render mi({ label: "Add Row Below", act: pc("tableAddRowBelow"), key: "Ctrl+Enter", disabled: !bs?.inTable, inSub: true })}
+              <div class="sep"></div>
+              {@render mi({ label: "Add Column Before", act: pc("tableAddColBefore"), disabled: !bs?.inTable, inSub: true })}
+              {@render mi({ label: "Add Column After", act: pc("tableAddColAfter"), disabled: !bs?.inTable, inSub: true })}
+              <div class="sep"></div>
+              {@render mi({ label: "Move Row Up", act: pc("tableMoveRowUp"), disabled: !bs?.inTable, inSub: true })}
+              {@render mi({ label: "Move Row Down", act: pc("tableMoveRowDown"), disabled: !bs?.inTable, inSub: true })}
+              {@render mi({ label: "Move Column Left", act: pc("tableMoveColLeft"), key: "Alt+←", disabled: !bs?.inTable, inSub: true })}
+              {@render mi({ label: "Move Column Right", act: pc("tableMoveColRight"), key: "Alt+→", disabled: !bs?.inTable, inSub: true })}
+              <div class="sep"></div>
+              {@render mi({ label: "Delete Row", act: pc("tableDeleteRow"), key: "Ctrl+Shift+Backspace", disabled: !bs?.inTable, inSub: true })}
+              {@render mi({ label: "Delete Column", act: pc("tableDeleteCol"), disabled: !bs?.inTable, inSub: true })}
+              <div class="sep"></div>
+              {@render mi({ label: "Copy Table", act: () => workspace.copyTable(), disabled: !bs?.inTable, inSub: true })}
+              {@render mi({ label: "Prettify Source Code", act: pc("tablePrettify"), disabled: !bs?.inTable, inSub: true })}
+              <div class="sep"></div>
+              {@render mi({ label: "Delete Table", act: pc("tableDelete"), disabled: !bs?.inTable, inSub: true })}
+            </div>
+          {/if}
+        </div>
+
+        {@render mi({ label: "Math Block", act: pc("mathBlock"), key: "Ctrl+Shift+M" })}
+        {@render mi({ label: "Code Fences", act: pc("codeFence"), key: "Ctrl+Shift+K" })}
+
+        <div class="submenu-anchor">
+          <button class="mi has-sub" role="menuitem" onmouseenter={() => (sub = "code")}>
+            <span class="check"></span><span class="lbl">Code Tools</span><span class="arrow">›</span>
+          </button>
+          {#if sub === "code"}
+            <div class="dropdown submenu" role="menu">
+              {@render mi({ label: "Copy Code Content", act: () => workspace.copyCodeContent(), disabled: !bs?.inCode, inSub: true })}
+              {@render mi({ label: "Auto Indent Selected Code", act: pc("autoIndentSelected"), disabled: !bs?.inCode, inSub: true })}
+              {@render mi({ label: "Auto Indent Whole Code", act: pc("autoIndentWhole"), disabled: !bs?.inCode, inSub: true })}
+            </div>
+          {/if}
+        </div>
+
+        <div class="submenu-anchor">
+          <button class="mi has-sub" role="menuitem" onmouseenter={() => (sub = "alert")}>
+            <span class="check"></span><span class="lbl">Alert</span><span class="arrow">›</span>
+          </button>
+          {#if sub === "alert"}
+            <div class="dropdown submenu" role="menu">
+              {@render mi({ label: "Note Block", act: pc("alertNote"), inSub: true })}
+              {@render mi({ label: "Tip Block", act: pc("alertTip"), inSub: true })}
+              {@render mi({ label: "Important Block", act: pc("alertImportant"), inSub: true })}
+              {@render mi({ label: "Warning Block", act: pc("alertWarning"), inSub: true })}
+              {@render mi({ label: "Caution Block", act: pc("alertCaution"), inSub: true })}
+            </div>
+          {/if}
+        </div>
+        <div class="sep"></div>
+
+        {@render mi({ label: "Quote", act: pc("quote"), key: "Ctrl+Shift+Q" })}
+        <div class="sep"></div>
+
+        {@render mi({ label: "Ordered List", act: pc("listOrdered"), key: "Ctrl+Shift+[", checked: bs?.orderedList })}
+        {@render mi({ label: "Unordered List", act: pc("listUnordered"), key: "Ctrl+Shift+]", checked: bs?.bulletList })}
+        {@render mi({ label: "Task List", act: pc("listTask"), key: "Ctrl+Shift+X", checked: bs?.taskList })}
+
+        <div class="submenu-anchor">
+          <button class="mi has-sub" role="menuitem" onmouseenter={() => (sub = "task")}>
+            <span class="check"></span><span class="lbl">Task Status</span><span class="arrow">›</span>
+          </button>
+          {#if sub === "task"}
+            <div class="dropdown submenu" role="menu">
+              {@render mi({ label: "Toggle Task Status", act: pc("taskToggle"), disabled: !bs?.taskList, inSub: true })}
+              <div class="sep"></div>
+              {@render mi({ label: "Mark as Complete", act: pc("taskComplete"), disabled: !bs?.taskList, checked: bs?.taskChecked === true, inSub: true })}
+              {@render mi({ label: "Mark as Incomplete", act: pc("taskIncomplete"), disabled: !bs?.taskList, checked: bs?.taskChecked === false, inSub: true })}
+            </div>
+          {/if}
+        </div>
+
+        <div class="submenu-anchor">
+          <button class="mi has-sub" role="menuitem" onmouseenter={() => (sub = "indent")}>
+            <span class="check"></span><span class="lbl">List Indentation</span><span class="arrow">›</span>
+          </button>
+          {#if sub === "indent"}
+            <div class="dropdown submenu" role="menu">
+              {@render mi({ label: "Indent", act: pc("indent"), key: "Ctrl+]", inSub: true })}
+              {@render mi({ label: "Outdent", act: pc("outdent"), key: "Ctrl+[", inSub: true })}
+            </div>
+          {/if}
+        </div>
+        <div class="sep"></div>
+
+        {@render mi({ label: "Insert Paragraph Before", act: pc("insertParagraphBefore") })}
+        {@render mi({ label: "Insert Paragraph After", act: pc("insertParagraphAfter") })}
+        <div class="sep"></div>
+
+        {@render mi({ label: "Link Reference", act: pc("linkReference") })}
+        {@render mi({ label: "Footnotes", act: pc("footnote") })}
+        <div class="sep"></div>
+
+        {@render mi({ label: "Horizontal Line", act: pc("horizontalRule") })}
+        {@render mi({ label: "Table of Contents", act: pc("tableOfContents") })}
+        {@render mi({ label: "YAML Front Matter", act: pc("yamlFrontMatter") })}
+      </div>
+    {/if}
+  </div>
+
+  <div class="menu">
+    <button
+      class="menu-title"
       class:active={open === "view"}
       onclick={() => toggle("view")}
       onmouseenter={() => hover("view")}
@@ -288,5 +461,36 @@
     height: 1px;
     background: var(--border);
     margin: 4px 6px;
+  }
+
+  /* Paragraph menu: checkmark column, labels, submenu flyouts. */
+  .dropdown button.mi {
+    gap: 8px;
+    justify-content: flex-start;
+  }
+  .mi .check {
+    flex: 0 0 16px;
+    text-align: center;
+    font-size: 12px;
+  }
+  .mi .lbl {
+    flex: 1 1 auto;
+  }
+  .mi .arrow {
+    flex: 0 0 auto;
+    opacity: 0.6;
+    font-size: 14px;
+  }
+  .dropdown button.mi:hover:not(:disabled) .arrow {
+    opacity: 0.9;
+  }
+  .submenu-anchor {
+    position: relative;
+  }
+  .dropdown.submenu {
+    top: -5px;
+    left: 100%;
+    border-radius: 6px;
+    z-index: 60;
   }
 </style>
