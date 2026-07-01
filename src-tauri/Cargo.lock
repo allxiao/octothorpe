@@ -2361,6 +2361,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "octothorpe"
+version = "0.1.0"
+dependencies = [
+ "image",
+ "notify",
+ "notify-debouncer-full",
+ "pulldown-cmark",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-clipboard-manager",
+ "tauri-plugin-dialog",
+ "thiserror 2.0.18",
+ "walkdir",
+ "windows",
+]
+
+[[package]]
 name = "once_cell"
 version = "1.21.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4040,27 +4061,6 @@ name = "try-lock"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
-
-[[package]]
-name = "typedown"
-version = "0.1.0"
-dependencies = [
- "image",
- "notify",
- "notify-debouncer-full",
- "pulldown-cmark",
- "rusqlite",
- "serde",
- "serde_json",
- "sha2",
- "tauri",
- "tauri-build",
- "tauri-plugin-clipboard-manager",
- "tauri-plugin-dialog",
- "thiserror 2.0.18",
- "walkdir",
- "windows",
-]
 
 [[package]]
 name = "typeid"

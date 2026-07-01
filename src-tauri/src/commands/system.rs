@@ -3,7 +3,7 @@
 
 use crate::error::{AppError, AppResult};
 
-/// Open a new Typedown window by spawning a fresh process. Each process owns its
+/// Open a new Octothorpe window by spawning a fresh process. Each process owns its
 /// state (folder + index + watcher), so windows are fully independent. `--new-window`
 /// makes the child start without restoring the last folder; `--untitled` opens it
 /// on an empty buffer.

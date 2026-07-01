@@ -1,5 +1,5 @@
 [package]
-name = "typedown"
+name = "octothorpe"
 version = "0.1.0"
 description = "A Typora-like Markdown editor with document management"
 authors = ["Menghua Xiao"]
@@ -8,7 +8,7 @@ edition = "2021"
 [lib]
 # The `_lib` suffix avoids a name clash with the bin target on Windows.
 # See https://github.com/rust-lang/cargo/issues/8519
-name = "typedown_lib"
+name = "octothorpe_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

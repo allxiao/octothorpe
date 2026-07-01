@@ -68,7 +68,7 @@ export const showProperties = (path: string) => invoke<void>("show_properties", 
 export const revealInDir = (path: string) => invoke<void>("reveal_in_dir", { path });
 /** Open a URL (or file path) with the OS default handler. */
 export const openUrl = (url: string) => invoke<void>("open_url", { url });
-/** Spawn a fresh Typedown window/process. `untitled` opens it on an empty buffer. */
+/** Spawn a fresh Octothorpe window/process. `untitled` opens it on an empty buffer. */
 export const newWindow = (untitled = false) => invoke<void>("new_window", { untitled });
 
 export interface StartupOptions {

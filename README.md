@@ -1,10 +1,10 @@
-# Typedown
+# Octothorpe
 
 A fast, local-first Markdown editor that renders **while you type** (Typora-style),
 with Bear-style inline tags, full-text search, and a vault-based document manager.
 
 Built with **Tauri 2** (Rust core) + **CodeMirror 6** + **Svelte**. Your notes are
-plain `.md` files on disk; a per-vault SQLite index (in `<vault>/.typedown/`) powers
+plain `.md` files on disk; a per-vault SQLite index (in `<vault>/.octothorpe/`) powers
 the tree, tags, and search and is rebuildable at any time.
 
 ## Features
