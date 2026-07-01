@@ -28,11 +28,26 @@ const PARAGRAPH_KEYS: { key: string; id: string }[] = [
   { key: "Mod-Shift-x", id: "listTask" },
   { key: "Mod-]", id: "indent" },
   { key: "Mod-[", id: "outdent" },
+  { key: "Mod-t", id: "tableInsert" },
 ];
 
 const paragraphKeymap = PARAGRAPH_KEYS.map(({ key, id }) => ({
   key,
   preventDefault: true,
+  run: (view: EditorView) => COMMANDS[id](view),
+}));
+
+// Table-navigation keys: only consume the key when the caret is in a table (the
+// command returns false otherwise), so they fall through to CodeMirror defaults.
+const TABLE_KEYS: { key: string; id: string }[] = [
+  { key: "Mod-Enter", id: "tableAddRowBelow" },
+  { key: "Alt-ArrowLeft", id: "tableMoveColLeft" },
+  { key: "Alt-ArrowRight", id: "tableMoveColRight" },
+  { key: "Mod-Shift-Backspace", id: "tableDeleteRow" },
+];
+
+const tableKeymap = TABLE_KEYS.map(({ key, id }) => ({
+  key,
   run: (view: EditorView) => COMMANDS[id](view),
 }));
 
@@ -64,6 +79,7 @@ export function baseExtensions(onSave?: () => void): Extension[] {
       },
       indentWithTab,
       ...paragraphKeymap,
+      ...tableKeymap,
       ...defaultKeymap,
       ...historyKeymap,
       ...searchKeymap,

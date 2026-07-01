@@ -26,6 +26,22 @@ import {
   insertParagraphBefore,
   insertParagraphAfter,
 } from "./block";
+import {
+  tableInsert,
+  tableAddRowAbove,
+  tableAddRowBelow,
+  tableAddColBefore,
+  tableAddColAfter,
+  tableMoveRowUp,
+  tableMoveRowDown,
+  tableMoveColLeft,
+  tableMoveColRight,
+  tableDeleteRow,
+  tableDeleteCol,
+  tablePrettify,
+  tableDelete,
+} from "./table";
+import { autoIndentSelected, autoIndentWhole } from "./code";
 
 export type EditorCommand = (view: EditorView) => boolean;
 
@@ -65,6 +81,23 @@ export const COMMANDS: Record<string, EditorCommand> = {
   alertImportant: alert("IMPORTANT"),
   alertWarning: alert("WARNING"),
   alertCaution: alert("CAUTION"),
+
+  tableInsert,
+  tableAddRowAbove,
+  tableAddRowBelow,
+  tableAddColBefore,
+  tableAddColAfter,
+  tableMoveRowUp,
+  tableMoveRowDown,
+  tableMoveColLeft,
+  tableMoveColRight,
+  tableDeleteRow,
+  tableDeleteCol,
+  tablePrettify,
+  tableDelete,
+
+  autoIndentSelected,
+  autoIndentWhole,
 };
 
 export { blockState } from "./blockState";
