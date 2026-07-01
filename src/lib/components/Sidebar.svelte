@@ -79,9 +79,35 @@
     weights[aId] = na;
     weights[bId] = nb;
   }
+
+  // --- horizontal resize (drag the sidebar's right border) ---
+  let dragging = $state(false);
+  let startX = 0;
+  let startW = 0;
+
+  function onResizeDown(e: MouseEvent) {
+    e.preventDefault();
+    dragging = true;
+    startX = e.clientX;
+    startW = workspace.sidebarWidth;
+    document.body.style.cursor = "ew-resize";
+    document.body.style.userSelect = "none";
+    window.addEventListener("mousemove", onResizeMove);
+    window.addEventListener("mouseup", onResizeUp);
+  }
+  function onResizeMove(e: MouseEvent) {
+    workspace.setSidebarWidth(startW + (e.clientX - startX));
+  }
+  function onResizeUp() {
+    dragging = false;
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+    window.removeEventListener("mousemove", onResizeMove);
+    window.removeEventListener("mouseup", onResizeUp);
+  }
 </script>
 
-<aside class="sidebar">
+<aside class="sidebar" style="width: {workspace.sidebarWidth}px">
   <div class="view-header">{titles[workspace.activeView]}</div>
 
   {#if !workspace.root}
@@ -105,6 +131,9 @@
       {/each}
     </div>
   {/if}
+
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="resizer" class:dragging onmousedown={onResizeDown}></div>
 </aside>
 
 {#snippet filesSnip()}
@@ -145,7 +174,6 @@
 
 <style>
   .sidebar {
-    width: 260px;
     flex: 0 0 auto;
     height: 100%;
     overflow: hidden;
@@ -153,6 +181,22 @@
     background: var(--sidebar-bg);
     display: flex;
     flex-direction: column;
+    position: relative;
+  }
+  /* Drag the right border to resize the sidebar. */
+  .resizer {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 6px;
+    height: 100%;
+    cursor: ew-resize;
+    z-index: 6;
+  }
+  .resizer:hover,
+  .resizer.dragging {
+    background: var(--accent);
+    opacity: 0.35;
   }
   .view-header {
     flex: 0 0 auto;

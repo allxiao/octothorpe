@@ -59,6 +59,10 @@ function readPageWidth(): PageWidth {
   const v = readPref("octothorpe:pageWidth", "normal");
   return v === "medium" || v === "wide" ? v : "normal";
 }
+function readSidebarWidth(): number {
+  const n = Number(readPref("octothorpe:sidebarWidth", "260"));
+  return Number.isFinite(n) ? Math.max(180, Math.min(560, n)) : 260;
+}
 
 class Workspace {
   root = $state<string | null>(null);
@@ -73,6 +77,7 @@ class Workspace {
   /** View preferences (persisted). */
   pageWidth = $state<PageWidth>(readPageWidth());
   sourceMode = $state(readPref("octothorpe:sourceMode", "false") === "true");
+  sidebarWidth = $state<number>(readSidebarWidth());
 
   get pageWidthPx(): number {
     return this.pageWidth === "wide" ? 1200 : this.pageWidth === "medium" ? 1024 : 860;
@@ -84,6 +89,11 @@ class Workspace {
   toggleSourceMode() {
     this.sourceMode = !this.sourceMode;
     writePref("octothorpe:sourceMode", String(this.sourceMode));
+  }
+  setSidebarWidth(px: number) {
+    const w = Math.max(180, Math.min(560, Math.round(px)));
+    this.sidebarWidth = w;
+    writePref("octothorpe:sidebarWidth", String(w));
   }
 
   activeRelPath = $state<string | null>(null);
