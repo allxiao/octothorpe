@@ -8,6 +8,7 @@ import {
 import type { Extension } from "@codemirror/state";
 import { buildDecorations } from "./build";
 import { onTagClick } from "./config";
+import { tableField } from "./tableField";
 
 /**
  * Live-preview ViewPlugin. Rebuilds decorations on document, viewport, or
@@ -88,6 +89,23 @@ const livePreviewTheme = EditorView.theme({
     padding: "0.05em 0.35em",
     cursor: "pointer",
   },
+  ".cm-md-table-wrap": { margin: "0.4em 0", overflowX: "auto" },
+  ".cm-md-table": {
+    borderCollapse: "collapse",
+    fontFamily: "var(--editor-font, monospace)",
+    fontSize: "0.9em",
+  },
+  ".cm-md-table th, .cm-md-table td": {
+    border: "1px solid var(--border, #ccc)",
+    padding: "5px 10px",
+    minWidth: "3em",
+    verticalAlign: "top",
+  },
+  ".cm-md-table th": { background: "var(--button-hover-bg, #eee)", fontWeight: "600" },
+  ".cm-md-table th:focus, .cm-md-table td:focus": {
+    outline: "2px solid var(--accent, #3b82f6)",
+    outlineOffset: "-2px",
+  },
 });
 
 // Clicking a tag pill notifies the host (e.g. to filter the sidebar), without
@@ -106,5 +124,5 @@ const tagClickHandler = EditorView.domEventHandlers({
 
 /** The full live-preview extension bundle. */
 export function livePreview(): Extension {
-  return [livePreviewPlugin, livePreviewTheme, tagClickHandler];
+  return [tableField, livePreviewPlugin, livePreviewTheme, tagClickHandler];
 }

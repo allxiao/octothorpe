@@ -6,6 +6,7 @@ import { isElementActive, isLineActive } from "./reveal";
 import { imageBaseDir } from "./config";
 import { scanTagsInLine } from "./tagScan";
 import { ImageWidget, HrWidget, BulletWidget, CheckboxWidget } from "./widgets";
+import { tableRanges } from "./tableField";
 
 /**
  * Resolve a Markdown image URL to something the webview can load. Remote and
@@ -84,11 +85,17 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
   const slice = (from: number, to: number) => state.doc.sliceString(from, to);
   const baseDir = state.facet(imageBaseDir);
 
+  // Tables are rendered as editable block widgets (via a StateField); skip any
+  // inline decoration inside them.
+  const tables = tableRanges(state);
+  const inTable = (pos: number) => tables.some((t) => pos >= t.from && pos <= t.to);
+
   for (const { from, to } of view.visibleRanges) {
     syntaxTree(state).iterate({
       from,
       to,
       enter: (node) => {
+        if (inTable(node.from)) return false;
         const name = node.name;
 
         // --- Headings: size the line, hide the leading "# " markers ---
@@ -249,6 +256,7 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
     const lastLn = state.doc.lineAt(to).number;
     for (; ln <= lastLn; ln++) {
       const line = state.doc.line(ln);
+      if (inTable(line.from)) continue;
       for (const t of scanTagsInLine(line.text)) {
         decos.push(
           Decoration.mark({

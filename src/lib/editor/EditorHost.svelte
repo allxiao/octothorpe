@@ -123,6 +123,14 @@
     view?.focus();
   }
 
+  // Before saving, commit any in-progress table cell edit by blurring it
+  // (the table widget commits to the document on focusout).
+  function saveWithFlush() {
+    const active = document.activeElement as HTMLElement | null;
+    if (active?.closest(".cm-md-table-wrap")) active.blur();
+    onsave?.();
+  }
+
   function runCommand(id: string) {
     const cmd = COMMANDS[id];
     if (cmd && view) cmd(view);
@@ -146,7 +154,7 @@
     const state = EditorState.create({
       doc: content,
       extensions: [
-        ...baseExtensions(() => onsave?.()),
+        ...baseExtensions(saveWithFlush),
         baseDirComp.of(imageBaseDir.of(baseDir)),
         onTagClick.of((tag) => ontagclick?.(tag)),
         EditorView.updateListener.of((u) => {

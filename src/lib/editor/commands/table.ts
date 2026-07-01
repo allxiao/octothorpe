@@ -4,26 +4,36 @@
 
 import type { EditorView } from "@codemirror/view";
 import type { EditorState } from "@codemirror/state";
+import { detectFence } from "./code";
 
 export interface TableRange {
   top: number;
   bot: number;
 }
 
-type Align = "" | "left" | "center" | "right";
+export type Align = "" | "left" | "center" | "right";
 
-interface ParsedTable {
-  top: number;
-  bot: number;
+/** A table as pure data (no document positions), shared with the WYSIWYG widget. */
+export interface TableModel {
   header: string[];
   align: Align[];
   rows: string[][];
+}
+
+interface ParsedTable extends TableModel {
+  top: number;
+  bot: number;
   /** Caret location: row -1 = header, 0..n = body row index; col = column index. */
   cursor: { row: number; col: number };
 }
 
 const DELIM_RE = /^\s*\|?[\s:|-]*-[\s:|-]*\|?\s*$/;
 const isRowLine = (t: string) => t.includes("|") && t.trim() !== "";
+
+/** Whether a line is a table delimiter row (`| --- | :--: |`). */
+export function isDelimiterRow(text: string): boolean {
+  return DELIM_RE.test(text);
+}
 
 /** Locate the contiguous table block containing the caret, or null. */
 export function detectTable(state: EditorState): TableRange | null {
@@ -57,7 +67,7 @@ export function tableText(state: EditorState): string | null {
 
 // --- parsing --------------------------------------------------------------
 
-function parseRow(line: string): string[] {
+export function parseRow(line: string): string[] {
   let s = line.trim();
   if (s.startsWith("|")) s = s.slice(1);
   if (s.endsWith("|")) s = s.slice(0, -1);
@@ -132,24 +142,26 @@ function parseTable(state: EditorState): ParsedTable | null {
 
 // --- rendering ------------------------------------------------------------
 
-const renderRow = (cells: string[]) => "| " + cells.join(" | ") + " |";
+const escapeCell = (s: string) => s.replace(/\|/g, "\\|");
+const renderRow = (cells: string[]) => "| " + cells.map(escapeCell).join(" | ") + " |";
 const delimCell = (a: Align) =>
   a === "center" ? ":---:" : a === "left" ? ":---" : a === "right" ? "---:" : "---";
 const renderDelim = (align: Align[]) => "| " + align.map(delimCell).join(" | ") + " |";
 
-function render(t: ParsedTable): string[] {
+function render(t: TableModel): string[] {
   return [renderRow(t.header), renderDelim(t.align), ...t.rows.map(renderRow)];
 }
 
-function renderPretty(t: ParsedTable): string[] {
+function renderPretty(t: TableModel): string[] {
   const cols = t.header.length;
   const width: number[] = [];
   for (let c = 0; c < cols; c++) {
-    let w = t.header[c].length;
-    for (const r of t.rows) w = Math.max(w, (r[c] ?? "").length);
+    let w = escapeCell(t.header[c]).length;
+    for (const r of t.rows) w = Math.max(w, escapeCell(r[c] ?? "").length);
     width[c] = Math.max(3, w);
   }
-  const padCell = (s: string, c: number) => {
+  const padCell = (raw: string, c: number) => {
+    const s = escapeCell(raw);
     const len = width[c];
     if (t.align[c] === "right") return s.padStart(len);
     if (t.align[c] === "center") {
@@ -173,6 +185,70 @@ function renderPretty(t: ParsedTable): string[] {
       .join(" | ") +
     " |";
   return [row(t.header), delim, ...t.rows.map(row)];
+}
+
+// --- pure model helpers (shared with the WYSIWYG table widget) -------------
+
+/** Parse a table's Markdown text into a column-normalized model. */
+export function parseTableText(md: string): TableModel {
+  const lines = md.split("\n").filter((l) => l.trim() !== "");
+  let delimIdx = lines.findIndex((l) => DELIM_RE.test(l));
+  if (delimIdx < 1) delimIdx = 1;
+  const header = parseRow(lines[0] ?? "");
+  const align = parseRow(lines[delimIdx] ?? "").map(parseAlign);
+  const rows = lines.slice(delimIdx + 1).map(parseRow);
+  const cols = Math.max(header.length, align.length, ...rows.map((r) => r.length), 1);
+  const pad = <T>(a: T[], fill: T) => {
+    const out = a.slice(0, cols);
+    while (out.length < cols) out.push(fill);
+    return out;
+  };
+  return {
+    header: pad(header, ""),
+    align: pad(align, "" as Align),
+    rows: rows.map((r) => pad(r, "")),
+  };
+}
+
+/** Serialize a table model back to Markdown (optionally width-aligned). */
+export function renderTableText(model: TableModel, pretty = false): string {
+  return (pretty ? renderPretty(model) : render(model)).join("\n");
+}
+
+/** Find every table block overlapping the line range [from, to] (document positions). */
+export function findTables(
+  state: EditorState,
+  from: number,
+  to: number,
+): { from: number; to: number; md: string }[] {
+  const out: { from: number; to: number; md: string }[] = [];
+  const firstLine = state.doc.lineAt(from).number;
+  const lastLine = state.doc.lineAt(to).number;
+  let n = firstLine;
+  while (n <= lastLine) {
+    if (!isRowLine(state.doc.line(n).text)) {
+      n++;
+      continue;
+    }
+    let top = n;
+    let bot = n;
+    while (top > 1 && isRowLine(state.doc.line(top - 1).text)) top--;
+    while (bot < state.doc.lines && isRowLine(state.doc.line(bot + 1).text)) bot++;
+    let hasDelim = false;
+    for (let k = top; k <= bot; k++) {
+      if (DELIM_RE.test(state.doc.line(k).text)) {
+        hasDelim = true;
+        break;
+      }
+    }
+    if (hasDelim && bot - top >= 1) {
+      const f = state.doc.line(top).from;
+      const t = state.doc.line(bot).to;
+      out.push({ from: f, to: t, md: state.doc.sliceString(f, t) });
+    }
+    n = bot + 1;
+  }
+  return out;
 }
 
 /** Replace the table block with `lines` and place the caret on table-line `targetIdx`. */
@@ -320,6 +396,34 @@ export function tableDelete(view: EditorView): boolean {
   // include the trailing newline so no blank line is left behind
   const to = Math.min(state.doc.line(r.bot).to + 1, state.doc.length);
   view.dispatch({ changes: { from, to, insert: "" }, selection: { anchor: from }, scrollIntoView: true });
+  view.focus();
+  return true;
+}
+
+/**
+ * Enter on a lone pipe-row header (`|a|b|`) completes it into a table by adding a
+ * delimiter row and an empty body row. Returns false (normal Enter) otherwise.
+ */
+export function autoTable(view: EditorView): boolean {
+  const { state } = view;
+  const sel = state.selection.main;
+  if (!sel.empty) return false;
+  const line = state.doc.lineAt(sel.head);
+  if (sel.head !== line.to) return false; // only at the end of the line
+  const text = line.text;
+  if (!text.includes("|") || DELIM_RE.test(text)) return false;
+  if (line.number < state.doc.lines && DELIM_RE.test(state.doc.line(line.number + 1).text)) {
+    return false; // already the header of a table
+  }
+  if (detectFence(state)) return false; // not inside a code fence
+  const cols = Math.max(1, parseRow(text).length);
+  const delim = "|" + " --- |".repeat(cols);
+  const body = "|" + "  |".repeat(cols);
+  view.dispatch({
+    changes: { from: line.to, insert: "\n" + delim + "\n" + body },
+    selection: { anchor: line.to + 1 + delim.length + 1 + 2 },
+    scrollIntoView: true,
+  });
   view.focus();
   return true;
 }
