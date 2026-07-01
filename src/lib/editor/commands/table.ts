@@ -210,6 +210,15 @@ export function tableInsert(view: EditorView): boolean {
   return true;
 }
 
+/** A `cols`-wide GFM table skeleton with `rows` total rows (1 header + body). */
+export function tableSkeleton(cols: number, rows: number): string {
+  const c = Math.max(1, Math.round(cols));
+  const body = Math.max(1, Math.round(rows) - 1);
+  const rowLine = "|" + "  |".repeat(c);
+  const delim = "|" + " --- |".repeat(c);
+  return [rowLine, delim, ...Array(body).fill(rowLine)].join("\n");
+}
+
 function op(fn: (t: ParsedTable) => { lines: string[]; target: number } | null) {
   return (view: EditorView): boolean => {
     const t = parseTable(view.state);

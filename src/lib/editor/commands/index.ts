@@ -102,5 +102,5 @@ export const COMMANDS: Record<string, EditorCommand> = {
 
 export { blockState } from "./blockState";
 export type { BlockState } from "./blockState";
-export { tableText } from "./table";
+export { tableText, tableSkeleton } from "./table";
 export { codeText } from "./code";

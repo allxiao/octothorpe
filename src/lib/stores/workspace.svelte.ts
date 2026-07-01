@@ -29,6 +29,7 @@ export interface EditorApi {
   blockState: () => BlockState | null;
   tableText: () => string | null;
   codeText: () => string | null;
+  insertTable: (cols: number, rows: number) => void;
 }
 
 class Workspace {
@@ -220,6 +221,21 @@ class Workspace {
   }
   blockState(): BlockState | null {
     return this.#editor?.blockState() ?? null;
+  }
+
+  // --- insert-table dialog -------------------------------------------------
+
+  insertTableOpen = $state(false);
+
+  openInsertTable() {
+    this.insertTableOpen = true;
+  }
+  cancelInsertTable() {
+    this.insertTableOpen = false;
+  }
+  confirmInsertTable(cols: number, rows: number) {
+    this.insertTableOpen = false;
+    this.#editor?.insertTable(cols, rows);
   }
 
   async copyTable() {

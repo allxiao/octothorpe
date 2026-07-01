@@ -255,7 +255,7 @@
           </button>
           {#if sub === "table"}
             <div class="dropdown submenu" role="menu">
-              {@render mi({ label: "Insert Table", act: pc("tableInsert"), key: "Ctrl+T", inSub: true })}
+              {@render mi({ label: "Insert Table", act: () => workspace.openInsertTable(), key: "Ctrl+T", inSub: true })}
               <div class="sep"></div>
               {@render mi({ label: "Add Row Above", act: pc("tableAddRowAbove"), disabled: !bs?.inTable, inSub: true })}
               {@render mi({ label: "Add Row Below", act: pc("tableAddRowBelow"), key: "Ctrl+Enter", disabled: !bs?.inTable, inSub: true })}

@@ -12,6 +12,7 @@
     blockState as computeBlockState,
     tableText as computeTableText,
     codeText as computeCodeText,
+    tableSkeleton,
   } from "./commands";
   import type { EditorApi } from "../stores/workspace.svelte";
 
@@ -127,6 +128,20 @@
     if (cmd && view) cmd(view);
   }
 
+  function insertTable(cols: number, rows: number) {
+    if (!view) return;
+    const { state } = view;
+    const line = state.doc.lineAt(state.selection.main.head);
+    const prefix = line.text.trim() === "" ? "" : "\n\n";
+    const sel = state.selection.main;
+    view.dispatch({
+      changes: { from: sel.from, to: sel.to, insert: prefix + tableSkeleton(cols, rows) },
+      selection: { anchor: sel.from + prefix.length + 1 },
+      scrollIntoView: true,
+    });
+    view.focus();
+  }
+
   onMount(() => {
     const state = EditorState.create({
       doc: content,
@@ -159,6 +174,7 @@
       blockState: () => (view ? computeBlockState(view.state) : null),
       tableText: () => (view ? computeTableText(view.state) : null),
       codeText: () => (view ? computeCodeText(view.state) : null),
+      insertTable,
     });
     // Dev-only hook so the live preview can be driven/inspected in a browser.
     if (import.meta.env.DEV) {

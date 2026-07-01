@@ -7,6 +7,7 @@
   import Sidebar from "./lib/components/Sidebar.svelte";
   import StatusBar from "./lib/components/StatusBar.svelte";
   import EditorHost from "./lib/editor/EditorHost.svelte";
+  import InsertTableModal from "./lib/components/InsertTableModal.svelte";
 
   onMount(() => {
     void workspace.listenForChanges();
@@ -109,6 +110,13 @@
   </div>
   <StatusBar />
 </div>
+
+{#if workspace.insertTableOpen}
+  <InsertTableModal
+    onConfirm={(cols, rows) => workspace.confirmInsertTable(cols, rows)}
+    onCancel={() => workspace.cancelInsertTable()}
+  />
+{/if}
 
 <style>
   .app {
