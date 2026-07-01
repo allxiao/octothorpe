@@ -4,6 +4,7 @@
 import * as ipc from "../ipc/commands";
 import type { DocumentMeta, SearchHit, TagNode, TreeNode } from "../ipc/types";
 import type { BlockState } from "../editor/commands";
+import type { InlineState } from "../editor/commands";
 import {
   getActiveTable,
   runActiveTableCommand,
@@ -32,6 +33,7 @@ export interface EditorApi {
   focus: () => void;
   runCommand: (id: string) => void;
   blockState: () => BlockState | null;
+  inlineState: () => InlineState | null;
   tableText: () => string | null;
   codeText: () => string | null;
   insertTable: (cols: number, rows: number) => void;
@@ -226,6 +228,43 @@ class Workspace {
   }
   blockState(): BlockState | null {
     return this.#editor?.blockState() ?? null;
+  }
+
+  // --- format menu ---------------------------------------------------------
+
+  inlineState(): InlineState | null {
+    return this.#editor?.inlineState() ?? null;
+  }
+
+  /** Resolve the link URL under the caret to something openable (relative → abs). */
+  #resolveLinkUrl(): string | null {
+    const url = this.#editor?.inlineState()?.linkUrl;
+    if (!url) return null;
+    if (/^[a-z]+:/i.test(url) || url.startsWith("//")) return url; // http:, mailto:, file:, …
+    if (!this.baseDir) return url;
+    const sep = this.baseDir.includes("\\") ? "\\" : "/";
+    return this.baseDir.replace(/[\\/]+$/, "") + sep + url.replace(/\//g, sep);
+  }
+
+  async openLink() {
+    const url = this.#resolveLinkUrl();
+    if (!url) return;
+    try {
+      await ipc.openUrl(url);
+    } catch (e) {
+      this.status = `Open link failed: ${e}`;
+    }
+  }
+
+  async copyLinkAddress() {
+    const url = this.#editor?.inlineState()?.linkUrl;
+    if (!url) return;
+    try {
+      await ipc.clipboardWriteText(url);
+      this.status = "Link copied";
+    } catch (e) {
+      this.status = `Copy link failed: ${e}`;
+    }
   }
 
   /** Whether a rendered table is currently the target for table menu commands. */

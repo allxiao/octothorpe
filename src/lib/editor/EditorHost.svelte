@@ -10,6 +10,7 @@
   import {
     COMMANDS,
     blockState as computeBlockState,
+    inlineState as computeInlineState,
     tableText as computeTableText,
     codeText as computeCodeText,
     tableSkeleton,
@@ -187,6 +188,7 @@
       focus: focusEditor,
       runCommand,
       blockState: () => (view ? computeBlockState(view.state) : null),
+      inlineState: () => (view ? computeInlineState(view.state) : null),
       tableText: () => (view ? computeTableText(view.state) : null),
       codeText: () => (view ? computeCodeText(view.state) : null),
       insertTable,

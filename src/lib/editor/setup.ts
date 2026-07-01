@@ -52,6 +52,24 @@ const tableKeymap = TABLE_KEYS.map(({ key, id }) => ({
   run: (view: EditorView) => COMMANDS[id](view),
 }));
 
+// Format-menu keybindings. Before defaultKeymap so Mod-i overrides its
+// selectParentSyntax binding.
+const FORMAT_KEYS: { key: string; id: string }[] = [
+  { key: "Mod-b", id: "toggleBold" },
+  { key: "Mod-i", id: "toggleItalic" },
+  { key: "Mod-u", id: "toggleUnderline" },
+  { key: "Mod-Shift-`", id: "toggleCode" },
+  { key: "Alt-Shift-5", id: "toggleStrike" },
+  { key: "Mod-k", id: "toggleLink" },
+  { key: "Mod-\\", id: "clearFormat" },
+];
+
+const formatKeymap = FORMAT_KEYS.map(({ key, id }) => ({
+  key,
+  preventDefault: true,
+  run: (view: EditorView) => COMMANDS[id](view),
+}));
+
 /**
  * Base CodeMirror extensions shared by the editor. The live-preview decoration
  * layer (M1) will be layered on top of this; for M0 this is a plain, wrapped
@@ -83,6 +101,7 @@ export function baseExtensions(onSave?: () => void): Extension[] {
       { key: "ArrowUp", run: enterTableUp },
       { key: "ArrowDown", run: enterTableDown },
       ...paragraphKeymap,
+      ...formatKeymap,
       ...tableKeymap,
       ...defaultKeymap,
       ...historyKeymap,

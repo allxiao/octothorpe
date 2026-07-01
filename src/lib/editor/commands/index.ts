@@ -42,6 +42,17 @@ import {
   tableDelete,
 } from "./table";
 import { autoIndentSelected, autoIndentWhole } from "./code";
+import {
+  toggleBold,
+  toggleItalic,
+  toggleUnderline,
+  toggleCode,
+  toggleMath,
+  toggleStrike,
+  toggleComment,
+  toggleLink,
+  clearFormat,
+} from "./inline";
 
 export type EditorCommand = (view: EditorView) => boolean;
 
@@ -98,9 +109,21 @@ export const COMMANDS: Record<string, EditorCommand> = {
 
   autoIndentSelected,
   autoIndentWhole,
+
+  toggleBold,
+  toggleItalic,
+  toggleUnderline,
+  toggleCode,
+  toggleMath,
+  toggleStrike,
+  toggleComment,
+  toggleLink,
+  clearFormat,
 };
 
 export { blockState } from "./blockState";
 export type { BlockState } from "./blockState";
+export { inlineState } from "./inline";
+export type { InlineState } from "./inline";
 export { tableText, tableSkeleton } from "./table";
 export { codeText } from "./code";
