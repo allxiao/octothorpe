@@ -180,9 +180,14 @@
     padding: 24px;
     line-height: 1.6;
   }
+  .empty strong {
+    margin: 0 0.12em;
+  }
   .empty code {
     background: var(--button-hover-bg);
-    padding: 0 4px;
-    border-radius: 3px;
+    padding: 2px 6px;
+    margin: 0 0.18em;
+    border-radius: 4px;
+    font-size: 0.95em;
   }
 </style>

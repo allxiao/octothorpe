@@ -85,7 +85,7 @@
   <div class="view-header">{titles[workspace.activeView]}</div>
 
   {#if !workspace.root}
-    <div class="hint">No vault open. Use <strong>File ▸ Open Vault</strong>.</div>
+    <div class="hint">No folder open. Use <strong>File ▸ Open Folder</strong>.</div>
   {:else if workspace.activeView === "search"}
     <div class="search-wrap"><Search /></div>
   {:else}

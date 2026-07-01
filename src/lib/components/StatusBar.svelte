@@ -11,7 +11,7 @@
         <span class="item">filter: #{workspace.filterTag}</span>
       {/if}
     {:else}
-      <span class="item">No vault open</span>
+      <span class="item">No folder open</span>
     {/if}
   </div>
   <div class="right">
