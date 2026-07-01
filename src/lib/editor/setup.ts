@@ -5,7 +5,6 @@ import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirro
 import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from "@codemirror/language";
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
 import { markdownLang } from "./markdownLang";
-import { livePreview } from "./livePreview";
 import { COMMANDS } from "./commands";
 import { autoTable, enterTableUp, enterTableDown } from "./commands/table";
 
@@ -75,6 +74,11 @@ const formatKeymap = FORMAT_KEYS.map(({ key, id }) => ({
  * layer (M1) will be layered on top of this; for M0 this is a plain, wrapped
  * Markdown source editor.
  */
+/**
+ * Base CodeMirror extensions shared by the editor. The live-preview layer is
+ * added separately by EditorHost (via a compartment, so source-code mode can
+ * toggle it).
+ */
 export function baseExtensions(onSave?: () => void): Extension[] {
   return [
     history(),
@@ -85,7 +89,6 @@ export function baseExtensions(onSave?: () => void): Extension[] {
     bracketMatching(),
     syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
     markdownLang(),
-    livePreview(),
     EditorView.lineWrapping,
     keymap.of([
       {

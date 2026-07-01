@@ -1,10 +1,11 @@
 <script lang="ts">
-  import { onMount, onDestroy } from "svelte";
+  import { onMount, onDestroy, untrack } from "svelte";
   import { EditorView } from "@codemirror/view";
   import { EditorState, Compartment, Annotation } from "@codemirror/state";
   import { undo, redo, undoDepth, redoDepth } from "@codemirror/commands";
   import { syntaxTree } from "@codemirror/language";
   import { baseExtensions } from "./setup";
+  import { livePreview } from "./livePreview";
   import { imageBaseDir, onTagClick } from "./livePreview/config";
   import { resolveImageFsPath } from "./livePreview/build";
   import {
@@ -21,6 +22,7 @@
   let {
     content = "",
     baseDir = "",
+    sourceMode = false,
     onchange,
     onsave,
     ontagclick,
@@ -28,6 +30,7 @@
   }: {
     content: string;
     baseDir?: string;
+    sourceMode?: boolean;
     onchange?: (value: string) => void;
     onsave?: () => void;
     ontagclick?: (tag: string) => void;
@@ -37,6 +40,8 @@
   let host: HTMLDivElement;
   let view: EditorView | undefined;
   const baseDirComp = new Compartment();
+  // Toggles the live-preview layer for source-code mode.
+  const livePreviewComp = new Compartment();
   // Marks a programmatic document reset (opening a file / new buffer) so it
   // isn't reported as a user edit.
   const External = Annotation.define<boolean>();
@@ -163,6 +168,7 @@
       doc: content,
       extensions: [
         ...baseExtensions(saveWithFlush),
+        livePreviewComp.of(sourceMode ? [] : livePreview()),
         baseDirComp.of(imageBaseDir.of(baseDir)),
         onTagClick.of((tag) => ontagclick?.(tag)),
         EditorView.updateListener.of((u) => {
@@ -222,6 +228,16 @@
     const dir = baseDir;
     if (view) {
       view.dispatch({ effects: baseDirComp.reconfigure(imageBaseDir.of(dir)) });
+    }
+  });
+
+  // Toggle the live-preview layer for source-code mode.
+  let appliedSource = untrack(() => sourceMode);
+  $effect(() => {
+    const sm = sourceMode;
+    if (view && sm !== appliedSource) {
+      appliedSource = sm;
+      view.dispatch({ effects: livePreviewComp.reconfigure(sm ? [] : livePreview()) });
     }
   });
 </script>

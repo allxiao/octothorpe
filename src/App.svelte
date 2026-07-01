@@ -90,6 +90,7 @@
           <EditorHost
             content={workspace.content}
             baseDir={workspace.baseDir}
+            sourceMode={workspace.sourceMode}
             onchange={(v) => workspace.setContent(v)}
             onsave={handleSave}
             ontagclick={(tag) => workspace.selectTag(tag)}
