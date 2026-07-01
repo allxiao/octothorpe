@@ -33,6 +33,7 @@ pub fn run() {
             commands::system::startup_options,
             commands::system::show_properties,
             commands::system::reveal_in_dir,
+            commands::system::open_url,
             commands::edit::markdown_to_html,
             commands::edit::markdown_to_plaintext,
             commands::edit::copy_image,

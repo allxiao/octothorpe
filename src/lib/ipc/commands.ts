@@ -66,6 +66,8 @@ export const unwatchFile = () => invoke<void>("unwatch_file");
 export const showProperties = (path: string) => invoke<void>("show_properties", { path });
 /** Reveal a file in the OS file manager (Explorer/Finder), selecting it. */
 export const revealInDir = (path: string) => invoke<void>("reveal_in_dir", { path });
+/** Open a URL (or file path) with the OS default handler. */
+export const openUrl = (url: string) => invoke<void>("open_url", { url });
 /** Spawn a fresh Typedown window/process. `untitled` opens it on an empty buffer. */
 export const newWindow = (untitled = false) => invoke<void>("new_window", { untitled });
 

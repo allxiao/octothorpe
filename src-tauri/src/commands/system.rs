@@ -52,6 +52,12 @@ pub fn reveal_in_dir(path: String) -> AppResult<()> {
     reveal_in_dir_impl(&path)
 }
 
+/// Open a URL (or file path) with the OS default handler (e.g. the browser).
+#[tauri::command]
+pub fn open_url(url: String) -> AppResult<()> {
+    open_url_impl(&url)
+}
+
 // --- Properties: per-OS native dialog -------------------------------------
 
 #[cfg(windows)]
@@ -151,6 +157,38 @@ fn reveal_in_dir_impl(path: &str) -> AppResult<()> {
         .unwrap_or_else(|| ".".into());
     std::process::Command::new("xdg-open")
         .arg(parent)
+        .spawn()
+        .map_err(|e| AppError::Other(format!("xdg-open failed: {e}")))?;
+    Ok(())
+}
+
+// --- Open a URL with the OS default handler --------------------------------
+
+#[cfg(windows)]
+fn open_url_impl(url: &str) -> AppResult<()> {
+    use std::os::windows::process::CommandExt;
+    // `start` is a cmd builtin; the empty "" is its (window-title) first arg so a
+    // quoted URL isn't consumed as the title. raw_arg avoids std's re-quoting.
+    std::process::Command::new("cmd")
+        .raw_arg(format!("/c start \"\" \"{}\"", url.replace('"', "")))
+        .spawn()
+        .map_err(|e| AppError::Other(format!("failed to open URL: {e}")))?;
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn open_url_impl(url: &str) -> AppResult<()> {
+    std::process::Command::new("open")
+        .arg(url)
+        .spawn()
+        .map_err(|e| AppError::Other(format!("open failed: {e}")))?;
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+fn open_url_impl(url: &str) -> AppResult<()> {
+    std::process::Command::new("xdg-open")
+        .arg(url)
         .spawn()
         .map_err(|e| AppError::Other(format!("xdg-open failed: {e}")))?;
     Ok(())
