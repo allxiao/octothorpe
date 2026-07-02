@@ -11,7 +11,7 @@ export interface FenceRange {
   closeLine: number;
 }
 
-const FENCE_RE = /^\s*(```|~~~)/;
+export const FENCE_RE = /^\s*(```|~~~)/;
 
 /** Locate the fenced code block containing the caret, or null. */
 export function detectFence(state: EditorState): FenceRange | null {

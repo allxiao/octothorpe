@@ -5,7 +5,7 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import { isElementActive, isLineActive } from "./reveal";
 import { imageBaseDir } from "./config";
 import { scanTagsInLine } from "./tagScan";
-import { ImageWidget, HrWidget, BulletWidget, CheckboxWidget } from "./widgets";
+import { ImageWidget, HrWidget, BulletWidget, CheckboxWidget, CodeLangWidget } from "./widgets";
 import { tableRanges } from "./tableField";
 
 /**
@@ -90,6 +90,11 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
   const tables = tableRanges(state);
   const inTable = (pos: number) => tables.some((t) => pos >= t.from && pos <= t.to);
 
+  // Fenced code blocks decorate their own lines; the plain-text tag scan below
+  // must skip them so `#define` / `#000` inside code don't become tag pills.
+  const codeRanges: { from: number; to: number }[] = [];
+  const inCode = (pos: number) => codeRanges.some((r) => pos >= r.from && pos <= r.to);
+
   for (const { from, to } of view.visibleRanges) {
     syntaxTree(state).iterate({
       from,
@@ -97,6 +102,70 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
       enter: (node) => {
         if (inTable(node.from)) return false;
         const name = node.name;
+
+        // --- Fenced code: render a *terminated* block as a styled box. The code
+        //     text stays real (natively highlighted); the fence lines collapse
+        //     away; the language shows in a bottom-right box. While the opening
+        //     fence is still being typed (no closing fence yet) it's left as raw
+        //     text so keystrokes stay visible. ---
+        if (name === "FencedCode") {
+          const n = node.node;
+          const marks = n.getChildren("CodeMark");
+          // Not terminated yet → leave as raw text (user is still typing it).
+          if (marks.length < 2) return false;
+          const openMark = marks[0];
+          const closeMark = marks[marks.length - 1];
+          const info = n.getChild("CodeInfo");
+          const openLine = state.doc.lineAt(node.from);
+          const closeLine = state.doc.lineAt(closeMark.from);
+
+          codeRanges.push({ from: node.from, to: node.to });
+
+          // Structural indent (list/quote nesting) sits before the fence and is
+          // excluded from the code nodes. Inset the box by it so the block lines
+          // up with its list item's content instead of the far-left margin.
+          const baseIndent = node.from - openLine.from;
+          const lineAttrs = baseIndent > 0 ? { style: `margin-left:${baseIndent}ch` } : undefined;
+
+          // Collapse the two fence lines (they only hold the hidden ``` marks).
+          lineClass(openLine.from, "cm-md-code-fence");
+          lineClass(closeLine.from, "cm-md-code-fence");
+          hide(openMark.from, openMark.to);
+          hide(closeMark.from, closeMark.to);
+          if (info) hide(info.from, info.to);
+
+          // Content lines form the visible box; first/last get the rounded caps.
+          const firstContent = openLine.number + 1;
+          const lastContent = closeLine.number - 1;
+          for (let ln = firstContent; ln <= lastContent; ln++) {
+            const line = state.doc.line(ln);
+            let cls = "cm-md-code-block";
+            if (ln === firstContent) cls += " cm-md-code-top";
+            if (ln === lastContent) cls += " cm-md-code-bottom";
+            decos.push(Decoration.line({ class: cls, attributes: lineAttrs }).range(line.from));
+            // Hide the structural indent whitespace (the margin stands in for it).
+            if (baseIndent > 0) {
+              const lead = /^[ \t]*/.exec(line.text)![0].length;
+              const k = Math.min(baseIndent, lead);
+              if (k > 0) hide(line.from, line.from + k);
+            }
+          }
+
+          // Language picker box, anchored to the collapsed closing fence line so
+          // it sits at the box's bottom-right without ever sharing a caret
+          // position with a code line.
+          const lang = info ? slice(info.from, info.to) : "";
+          const infoFrom = info ? info.from : openMark.to;
+          const infoTo = info ? info.to : infoFrom;
+          decos.push(
+            Decoration.widget({
+              widget: new CodeLangWidget(lang, infoFrom, infoTo),
+              side: 1,
+            }).range(closeLine.from),
+          );
+          // Don't descend: CodeText stays real text (natively highlighted).
+          return false;
+        }
 
         // --- Headings: size the line, hide the leading "# " markers ---
         if (/^(ATXHeading|SetextHeading)[1-6]$/.test(name)) {
@@ -220,6 +289,16 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
 
         // --- Bullet list marker -> glyph (stays a glyph while editing item text) ---
         if (name === "ListMark") {
+          // Task items render as `☐ text` — the checkbox stands in for the
+          // marker, so hide the bullet entirely rather than doubling it up.
+          const item = node.node.parent;
+          if (item?.name === "ListItem" && item.getChild("Task")) {
+            if (!isElementActive(state, node.from, node.to)) {
+              const after = slice(node.to, node.to + 1) === " " ? node.to + 1 : node.to;
+              hide(node.from, after);
+            }
+            return;
+          }
           const markText = slice(node.from, node.to);
           if ((markText === "-" || markText === "*" || markText === "+") &&
               !isElementActive(state, node.from, node.to)) {
@@ -256,7 +335,7 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
     const lastLn = state.doc.lineAt(to).number;
     for (; ln <= lastLn; ln++) {
       const line = state.doc.line(ln);
-      if (inTable(line.from)) continue;
+      if (inTable(line.from) || inCode(line.from)) continue;
       for (const t of scanTagsInLine(line.text)) {
         decos.push(
           Decoration.mark({

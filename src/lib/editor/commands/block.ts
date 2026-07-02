@@ -3,6 +3,7 @@
 
 import type { EditorView } from "@codemirror/view";
 import { insertText, mapLines, selectedLines } from "./util";
+import { detectFence, FENCE_RE } from "./code";
 
 const QUOTE_RE = /^(\s*)>\s?/;
 
@@ -106,6 +107,139 @@ export function insertParagraphAfter(view: EditorView): boolean {
     selection: { anchor: line.to + 1 },
     scrollIntoView: true,
   });
+  view.focus();
+  return true;
+}
+
+// A line that opens a fence: leading indent, the fence run, and an info string
+// with no further fence chars (so a bare closing ``` on its own line isn't matched).
+const OPEN_FENCE_RE = /^(\s*)(`{3,}|~{3,})([^`~]*)$/;
+
+/**
+ * Pressing Enter at the end of a just-typed opening fence (``` or ```lang)
+ * auto-completes the block: keep the opener, add a blank middle line (caret
+ * lands here), and a closing fence — all at the opener's indentation so a fence
+ * opened inside an indented list nests correctly. Returns false (falling through
+ * to autoTable / the default newline) when the line isn't an unclosed opener.
+ */
+export function autoCodeFence(view: EditorView): boolean {
+  const { state } = view;
+  const sel = state.selection.main;
+  if (!sel.empty) return false;
+  const line = state.doc.lineAt(sel.head);
+  if (sel.head !== line.to) return false; // only at end of line
+  const m = OPEN_FENCE_RE.exec(line.text);
+  if (!m) return false;
+
+  // Opening position? An even number of fence lines strictly above means this
+  // one opens (odd would mean the caret sits inside an already-open block).
+  let above = 0;
+  for (let n = 1; n < line.number; n++) {
+    if (FENCE_RE.test(state.doc.line(n).text)) above++;
+  }
+  if (above % 2 !== 0) return false;
+
+  // Already closed by a fence somewhere below? Then just insert a normal newline.
+  for (let n = line.number + 1; n <= state.doc.lines; n++) {
+    if (FENCE_RE.test(state.doc.line(n).text)) return false;
+  }
+
+  const indent = m[1];
+  const fence = m[2];
+  // The closing fence lands at EOF here; a transaction filter guarantees a line
+  // after it so the caret can still leave the block downward.
+  const insert = "\n" + indent + "\n" + indent + fence;
+  const anchor = line.to + 1 + indent.length; // start of the blank middle line
+  view.dispatch({ changes: { from: line.to, insert }, selection: { anchor }, scrollIntoView: true });
+  view.focus();
+  return true;
+}
+
+/**
+ * Focus the language picker input of the terminated fenced block on line
+ * `closeLine`. Returns false if no picker is rendered there (e.g. not yet
+ * terminated), letting the arrow key fall through to its default.
+ */
+function focusCodeLang(view: EditorView, closeLine: number): boolean {
+  const pos = view.state.doc.line(closeLine).from;
+  const { node } = view.domAtPos(pos);
+  const start = (node.nodeType === 3 ? node.parentElement : node) as HTMLElement | null;
+  const input = (start?.closest?.(".cm-md-code-lang")?.querySelector(".cm-md-code-lang-input") ??
+    start?.closest?.(".cm-line")?.querySelector(".cm-md-code-lang-input")) as
+    | HTMLInputElement
+    | null;
+  if (!input) return false;
+  input.focus();
+  const n = input.value.length;
+  try {
+    input.setSelectionRange(n, n);
+  } catch {
+    /* not selectable */
+  }
+  return true;
+}
+
+/** True when the caret is on the last content line of a terminated fenced block. */
+function onLastCodeLine(state: EditorView["state"]): number | null {
+  const sel = state.selection.main;
+  if (!sel.empty) return null;
+  const f = detectFence(state);
+  if (!f || f.closeLine === f.openLine) return null;
+  if (!FENCE_RE.test(state.doc.line(f.closeLine).text)) return null; // unterminated
+  if (state.doc.lineAt(sel.head).number !== f.closeLine - 1) return null;
+  return f.closeLine;
+}
+
+/** Down on the last code line jumps into the language picker. */
+export function codeLangDown(view: EditorView): boolean {
+  const closeLine = onLastCodeLine(view.state);
+  if (closeLine == null) return false;
+  return focusCodeLang(view, closeLine);
+}
+
+/** Right at the end of the last code line jumps into the language picker. */
+export function codeLangRight(view: EditorView): boolean {
+  const closeLine = onLastCodeLine(view.state);
+  if (closeLine == null) return false;
+  const sel = view.state.selection.main;
+  if (sel.head !== view.state.doc.lineAt(sel.head).to) return false;
+  return focusCodeLang(view, closeLine);
+}
+
+/**
+ * Backspace at the very start of a fenced block's first content line: if the
+ * block holds a single content line, strip the fences and leave that line as
+ * plain text; if it holds several, do nothing (swallow the key) so the hidden
+ * opening fence can't be merged into the content.
+ */
+export function codeFenceBackspace(view: EditorView): boolean {
+  const { state } = view;
+  const sel = state.selection.main;
+  if (!sel.empty) return false;
+  const f = detectFence(state);
+  if (!f) return false;
+
+  const line = state.doc.lineAt(sel.head);
+  if (line.number !== f.openLine + 1) return false; // only the first content line
+  if (sel.head !== line.from) return false; // only at its very start
+
+  const closeText = state.doc.line(f.closeLine).text;
+  const closed = f.closeLine !== f.openLine && FENCE_RE.test(closeText);
+  const contentLines = closed ? f.closeLine - f.openLine - 1 : state.doc.lines - f.openLine;
+
+  if (contentLines > 1) return true; // swallow: leave the block intact
+
+  // Single content line → remove the fences, keep the line as plain text.
+  const openLine = state.doc.line(f.openLine);
+  const contentLine = state.doc.line(f.openLine + 1);
+  const changes: { from: number; to: number }[] = [
+    { from: openLine.from, to: contentLine.from }, // opener line + its newline
+  ];
+  if (closed) {
+    const closeLine = state.doc.line(f.closeLine);
+    changes.push({ from: contentLine.to, to: closeLine.to }); // newline + closing fence
+  }
+  view.dispatch({ changes, selection: { anchor: openLine.from }, scrollIntoView: true });
   view.focus();
   return true;
 }

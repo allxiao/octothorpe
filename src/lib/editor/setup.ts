@@ -1,12 +1,31 @@
 import { EditorView, keymap, drawSelection, rectangularSelection,
   highlightActiveLine } from "@codemirror/view";
 import type { Extension } from "@codemirror/state";
+import { EditorState } from "@codemirror/state";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from "@codemirror/language";
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
 import { markdownLang } from "./markdownLang";
 import { COMMANDS } from "./commands";
 import { autoTable, enterTableUp, enterTableDown } from "./commands/table";
+import { autoCodeFence, codeFenceBackspace, codeLangDown, codeLangRight } from "./commands/block";
+import { FENCE_RE } from "./commands/code";
+
+/**
+ * Keep a caret-reachable line after a code block that ends the document: its
+ * closing fence renders collapsed, so without a trailing line there'd be nowhere
+ * below it to place the caret.
+ */
+const ensureLineAfterTrailingCode = EditorState.transactionFilter.of((tr) => {
+  if (!tr.docChanged) return tr;
+  const doc = tr.newDoc;
+  const last = doc.line(doc.lines);
+  if (!FENCE_RE.test(last.text)) return tr; // doesn't end on a fence
+  let fences = 0;
+  for (let n = 1; n <= doc.lines; n++) if (FENCE_RE.test(doc.line(n).text)) fences++;
+  if (fences % 2 !== 0) return tr; // trailing fence opens a block (still being typed)
+  return [tr, { changes: { from: doc.length, insert: "\n" }, sequential: true }];
+});
 
 // Paragraph-menu keybindings (editor-scoped). Placed before defaultKeymap so
 // list Indent/Outdent override CodeMirror's Mod-]/Mod-[.
@@ -89,6 +108,7 @@ export function baseExtensions(onSave?: () => void): Extension[] {
     bracketMatching(),
     syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
     markdownLang(),
+    ensureLineAfterTrailingCode,
     EditorView.lineWrapping,
     keymap.of([
       {
@@ -100,9 +120,13 @@ export function baseExtensions(onSave?: () => void): Extension[] {
         },
       },
       indentWithTab,
+      { key: "Backspace", run: codeFenceBackspace },
+      { key: "Enter", run: autoCodeFence },
       { key: "Enter", run: autoTable },
       { key: "ArrowUp", run: enterTableUp },
       { key: "ArrowDown", run: enterTableDown },
+      { key: "ArrowDown", run: codeLangDown },
+      { key: "ArrowRight", run: codeLangRight },
       ...paragraphKeymap,
       ...formatKeymap,
       ...tableKeymap,
