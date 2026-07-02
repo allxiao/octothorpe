@@ -6,9 +6,9 @@
   "additionalProperties": false,
   "x-ui": {
     "categories": [
+      { "id": "files", "label": "Files" },
       { "id": "editor", "label": "Editor" },
-      { "id": "appearance", "label": "Appearance" },
-      { "id": "files", "label": "Files" }
+      { "id": "appearance", "label": "Appearance" }
     ]
   },
   "properties": {
@@ -76,6 +76,32 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "onLaunch": {
+          "type": "string",
+          "default": "restoreFilesAndFolders",
+          "enum": ["openNewFile", "restoreFolders", "restoreFilesAndFolders", "openCustomFolder"],
+          "title": "On Launch",
+          "description": "What to open when the app starts.",
+          "x-ui": {
+            "category": "files",
+            "section": "General",
+            "control": "select",
+            "order": 1,
+            "options": [
+              { "value": "openNewFile", "label": "Open new file" },
+              { "value": "restoreFolders", "label": "Restore last closed folders" },
+              { "value": "restoreFilesAndFolders", "label": "Restore last closed files and folders" },
+              { "value": "openCustomFolder", "label": "Open custom folder" }
+            ]
+          }
+        },
+        "collapsibleOutline": {
+          "type": "boolean",
+          "default": false,
+          "title": "Collapsible Outline on Left Panel",
+          "description": "Show the document outline as a collapsible section in the left panel.",
+          "x-ui": { "category": "files", "section": "General", "control": "toggle", "order": 2 }
+        },
         "defaultExtension": {
           "type": "string",
           "default": ".md",
@@ -84,13 +110,85 @@
           "description": "Extension used when creating new documents.",
           "x-ui": {
             "category": "files",
-            "section": "New Documents",
+            "section": "General",
             "control": "select",
-            "order": 1,
+            "order": 3,
             "options": [
               { "value": ".md", "label": "Markdown (.md)" },
               { "value": ".markdown", "label": "Markdown (.markdown)" },
               { "value": ".txt", "label": "Plain Text (.txt)" }
+            ]
+          }
+        },
+        "autoSave": {
+          "type": "boolean",
+          "default": true,
+          "title": "Auto Save",
+          "description": "Automatically save changes to disk as you edit.",
+          "x-ui": { "category": "files", "section": "Save & Recover", "control": "toggle", "order": 1 }
+        },
+        "saveOnSwitch": {
+          "type": "boolean",
+          "default": true,
+          "title": "Save without asking when switching files",
+          "description": "When switching files in the side panel, save changes without prompting.",
+          "x-ui": { "category": "files", "section": "Save & Recover", "control": "toggle", "order": 2 }
+        },
+        "recordRecent": {
+          "type": "boolean",
+          "default": true,
+          "title": "Record recent files and folders",
+          "description": "Keep a list of recently opened files and folders.",
+          "x-ui": { "category": "files", "section": "Recent Locations", "control": "toggle", "order": 1 }
+        },
+        "onDropFolder": {
+          "type": "string",
+          "default": "open",
+          "enum": ["open", "insertLink"],
+          "title": "When drop folder",
+          "description": "Action taken when a folder is dropped into the window.",
+          "x-ui": {
+            "category": "files",
+            "section": "Drag & Drop",
+            "control": "select",
+            "order": 1,
+            "options": [
+              { "value": "open", "label": "Open in Octothorpe" },
+              { "value": "insertLink", "label": "Insert Folder Link" }
+            ]
+          }
+        },
+        "onDropMarkdown": {
+          "type": "string",
+          "default": "open",
+          "enum": ["open", "insertLink"],
+          "title": "When drop markdown file",
+          "description": "Action taken when a Markdown file is dropped into the window.",
+          "x-ui": {
+            "category": "files",
+            "section": "Drag & Drop",
+            "control": "select",
+            "order": 2,
+            "options": [
+              { "value": "open", "label": "Open in Octothorpe" },
+              { "value": "insertLink", "label": "Insert File Link" }
+            ]
+          }
+        },
+        "onDropImportable": {
+          "type": "string",
+          "default": "import",
+          "enum": ["import", "insertLink"],
+          "title": "When drop files that can be imported",
+          "description": "Action taken when an importable file is dropped into the window.",
+          "x-ui": {
+            "category": "files",
+            "section": "Drag & Drop",
+            "control": "select",
+            "order": 3,
+            "options": [
+              { "value": "import", "label": "Import File" },
+              { "value": "insertLink", "label": "Insert File Link" }
             ]
           }
         }
