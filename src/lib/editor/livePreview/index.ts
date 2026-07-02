@@ -6,6 +6,7 @@ import {
   type ViewUpdate,
 } from "@codemirror/view";
 import type { Extension } from "@codemirror/state";
+import { syntaxTree } from "@codemirror/language";
 import { buildDecorations } from "./build";
 import { onTagClick } from "./config";
 import { tableField } from "./tableField";
@@ -17,6 +18,51 @@ import { openUrl } from "../../ipc/commands";
 function openExternal(url: string) {
   if ("__TAURI_INTERNALS__" in window) void openUrl(url).catch(() => {});
   else window.open(url, "_blank", "noopener");
+}
+
+/**
+ * GitHub-style header anchor: lowercase, drop everything but letters/numbers
+ * within each whitespace-separated word, and join the words with `-`.
+ */
+function anchorOf(text: string): string {
+  return text
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .map((w) => w.replace(/[^a-z0-9]/g, ""))
+    .filter(Boolean)
+    .join("-");
+}
+
+/** Scroll to (and place the caret at) the header whose anchor matches `#anchor`. */
+function jumpToAnchor(view: EditorView, rawAnchor: string) {
+  const target = rawAnchor.toLowerCase();
+  const counts = new Map<string, number>();
+  let pos = -1;
+  syntaxTree(view.state).iterate({
+    enter: (node) => {
+      if (pos < 0 && /^(ATXHeading|SetextHeading)[1-6]$/.test(node.name)) {
+        const line = view.state.doc.lineAt(node.from);
+        const text = view.state.doc
+          .sliceString(node.from, Math.min(node.to, line.to))
+          .replace(/^\s*#+\s*/, "")
+          .replace(/\s+#+\s*$/, "");
+        let a = anchorOf(text);
+        const c = counts.get(a) ?? 0; // duplicate anchors get -2, -3, …
+        counts.set(a, c + 1);
+        if (c > 0) a = `${a}-${c + 1}`;
+        if (a === target) pos = line.from;
+        return false;
+      }
+      return undefined;
+    },
+  });
+  if (pos < 0) return;
+  view.focus();
+  view.dispatch({
+    selection: { anchor: pos },
+    effects: EditorView.scrollIntoView(pos, { y: "start" }),
+  });
 }
 
 /**
@@ -330,7 +376,8 @@ const interactionHandlers = EditorView.domEventHandlers({
       const href = link.getAttribute("data-href");
       if (href) {
         event.preventDefault();
-        openExternal(href);
+        if (href.startsWith("#")) jumpToAnchor(view, href.slice(1));
+        else openExternal(href);
         return true;
       }
       const missing = link.getAttribute("data-missing");

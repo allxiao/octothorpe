@@ -103,6 +103,11 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
   const codeRanges: { from: number; to: number }[] = [];
   const inCode = (pos: number) => codeRanges.some((r) => pos >= r.from && pos <= r.to);
 
+  // Link ranges, so the tag scan doesn't turn a `#anchor` inside `[text](#anchor)`
+  // into a tag pill (it's an internal section link, not a tag).
+  const linkRanges: { from: number; to: number }[] = [];
+  const inLink = (pos: number) => linkRanges.some((r) => pos >= r.from && pos < r.to);
+
   // Render a link reference definition line (`[id]: url "title"`): dim the
   // `[id]:` label, show the URL as a clickable link, and dim the title. Empty
   // URL/title slots get a placeholder that disappears once real text is typed
@@ -263,6 +268,9 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
         //     still rendered as a link, flagged with `data-missing` so Ctrl+click
         //     can scaffold the definition. ---
         if (name === "Link") {
+          // Record the span so a `#anchor` inside it isn't scanned as a tag,
+          // even while the link's raw source is revealed for editing.
+          linkRanges.push({ from: node.from, to: node.to });
           if (!isElementActive(state, node.from, node.to)) {
             const raw = slice(node.from, node.to);
             const inline = /^\[([^\]]*)\]\(\s*(\S+?)(?:\s+"([^"]*)")?\s*\)$/.exec(raw);
@@ -430,6 +438,7 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
         continue;
       }
       for (const t of scanTagsInLine(line.text)) {
+        if (inLink(line.from + t.start)) continue; // `#anchor` inside a link
         decos.push(
           Decoration.mark({
             class: "cm-md-tag",
