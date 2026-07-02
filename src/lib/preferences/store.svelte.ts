@@ -104,6 +104,12 @@ class PreferencesStore {
 
   /** Load and validate the on-disk config, hydrating overrides. Call once at startup. */
   async load(): Promise<void> {
+    // No Tauri backend (e.g. browser dev): use defaults, don't attempt IPC.
+    if (typeof window !== "undefined" && !("__TAURI_INTERNALS__" in window)) {
+      this.#loaded = true;
+      return;
+    }
+
     let data: Record<string, unknown> = {};
     try {
       const raw = await ipc.readPreferences();
@@ -161,6 +167,7 @@ class PreferencesStore {
 
   /** Serialize overrides (nested) + version and write to disk. */
   async save(): Promise<void> {
+    if (typeof window !== "undefined" && !("__TAURI_INTERNALS__" in window)) return;
     const overrides = this.#snapshotOverrides();
     const res = validatePreferences(this.#effectiveNested());
     if (!res.valid) {
