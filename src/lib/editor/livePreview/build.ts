@@ -237,6 +237,13 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
           return;
         }
 
+        // --- Backslash escape (`\*`, `\_`, …): hide the backslash so only the
+        //     literal character shows, unless the caret is on the escape. ---
+        if (name === "Escape") {
+          if (!isElementActive(state, node.from, node.to)) hide(node.from, node.from + 1);
+          return;
+        }
+
         // --- Inline emphasis / code / strikethrough: hide marks when the
         //     cursor is outside the *element* (not merely off the line) ---
         if (name === "EmphasisMark" || name === "StrikethroughMark") {
