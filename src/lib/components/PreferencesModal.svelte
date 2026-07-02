@@ -105,16 +105,6 @@
                       onchange={(e) => apply(entry, e.currentTarget.value)}
                     />
                   {/if}
-                  {#if preferences.isSet(entry.key)}
-                    <button
-                      class="reset"
-                      title="Reset to default"
-                      onclick={() => {
-                        preferences.reset(entry.key);
-                        error = null;
-                      }}>Reset</button
-                    >
-                  {/if}
                 </div>
               </div>
             {/each}
@@ -282,21 +272,6 @@
     width: 16px;
     height: 16px;
     cursor: pointer;
-  }
-  .reset {
-    font: inherit;
-    font-size: 11px;
-    padding: 3px 8px;
-    border: 1px solid var(--border);
-    border-radius: 5px;
-    background: var(--button-bg);
-    color: inherit;
-    cursor: pointer;
-    opacity: 0.75;
-  }
-  .reset:hover {
-    opacity: 1;
-    background: var(--button-hover-bg);
   }
   .err {
     margin-top: 16px;
