@@ -2,6 +2,7 @@
 // tag trees, the active document, the active sidebar view, and the tag filter.
 
 import * as ipc from "../ipc/commands";
+import { preferences } from "../preferences/store.svelte";
 import type { DocumentMeta, SearchHit, TagNode, TreeNode } from "../ipc/types";
 import type { BlockState } from "../editor/commands";
 import type { InlineState } from "../editor/commands";
@@ -398,6 +399,7 @@ class Workspace {
   }
 
   async loadVault(path: string) {
+    this.#clearAutoSave();
     const info = await ipc.openVault(path);
     this.root = info.root;
     this.docCount = info.docCount;
@@ -412,25 +414,37 @@ class Workspace {
     this.sidebarOverride = null;
     await this.refresh();
     this.status = "";
-    try {
-      localStorage.setItem("octothorpe:lastVault", path);
-    } catch {
-      // ignore (private mode, etc.)
+    if (preferences.get<boolean>("files.recordRecent")) {
+      try {
+        localStorage.setItem("octothorpe:lastVault", path);
+      } catch {
+        // ignore (private mode, etc.)
+      }
     }
   }
 
-  /** Reopen the most recently used vault on startup (Tauri only). */
-  async restoreLastVault() {
+  /** Reopen the most recently used vault on startup (Tauri only). When
+   *  `reopenFile` is set, also reopen the last-edited document in that vault. */
+  async restoreLastVault(reopenFile = true) {
     if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) return;
     let path: string | null = null;
+    let doc: string | null = null;
     try {
       path = localStorage.getItem("octothorpe:lastVault");
+      doc = localStorage.getItem("octothorpe:lastDoc");
     } catch {
       return;
     }
     if (path) {
       try {
         await this.loadVault(path);
+        if (reopenFile && doc) {
+          try {
+            await this.openDoc(doc);
+          } catch {
+            // last doc moved/removed — leave the folder open with no active doc
+          }
+        }
       } catch {
         // vault moved/removed — ignore and start empty
       }
@@ -451,6 +465,16 @@ class Workspace {
   // --- documents -----------------------------------------------------------
 
   async openDoc(relPath: string) {
+    // Save-on-switch: persist the current dirty doc before replacing it, without
+    // prompting (files.saveOnSwitch). Untitled buffers are left alone (no path).
+    if (
+      this.dirty &&
+      (this.activeRelPath || this.standalonePath) &&
+      preferences.get<boolean>("files.saveOnSwitch")
+    ) {
+      await this.save();
+    }
+    this.#clearAutoSave();
     try {
       const doc = await ipc.readDocument(relPath);
       void ipc.unwatchFile();
@@ -460,8 +484,19 @@ class Workspace {
       this.content = doc.content;
       this.dirty = false;
       this.externalChanged = false;
+      this.#recordLastDoc(relPath);
     } catch (e) {
       this.status = `Open failed: ${e}`;
+    }
+  }
+
+  /** Remember the last-opened vault doc for session restore (files.recordRecent). */
+  #recordLastDoc(relPath: string) {
+    if (!preferences.get<boolean>("files.recordRecent")) return;
+    try {
+      localStorage.setItem("octothorpe:lastDoc", relPath);
+    } catch {
+      // ignore (private mode, etc.)
     }
   }
 
@@ -508,12 +543,34 @@ class Workspace {
     this.sidebarOverride = null;
   }
 
+  #autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Debounced auto-save (files.autoSave). Only for docs already on disk — an
+   *  untitled buffer would pop a Save dialog, which isn't "automatic". */
+  #scheduleAutoSave() {
+    this.#clearAutoSave();
+    this.#autoSaveTimer = setTimeout(() => {
+      this.#autoSaveTimer = null;
+      if (this.dirty) void this.save();
+    }, 800);
+  }
+  #clearAutoSave() {
+    if (this.#autoSaveTimer) {
+      clearTimeout(this.#autoSaveTimer);
+      this.#autoSaveTimer = null;
+    }
+  }
+
   setContent(next: string) {
     this.content = next;
     this.dirty = true;
+    if (preferences.get<boolean>("files.autoSave") && (this.activeRelPath || this.standalonePath)) {
+      this.#scheduleAutoSave();
+    }
   }
 
   async save() {
+    this.#clearAutoSave();
     if (this.untitled) {
       await this.saveAs();
       return;
@@ -545,7 +602,8 @@ class Workspace {
   async saveAs() {
     if (!this.hasDoc) return;
     try {
-      const name = `${this.activeTitle || "Untitled"}.md`;
+      const ext = (preferences.get<string>("files.defaultExtension") || ".md").replace(/^\./, "");
+      const name = `${this.activeTitle || "Untitled"}.${ext}`;
       let defaultPath = name;
       if (this.activeAbsPath) {
         defaultPath = this.activeAbsPath; // existing file: start where it lives
@@ -609,6 +667,7 @@ class Workspace {
 
   /** Close the active document and clear the editor. */
   closeDoc() {
+    this.#clearAutoSave();
     void ipc.unwatchFile();
     this.activeRelPath = null;
     this.standalonePath = null;

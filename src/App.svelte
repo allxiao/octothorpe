@@ -13,10 +13,14 @@
   import PreferencesModal from "./lib/components/PreferencesModal.svelte";
 
   onMount(() => {
-    void preferences.load();
-    void workspace.listenForChanges();
-    void initStartup();
+    void boot();
   });
+
+  async function boot() {
+    await preferences.load();
+    void workspace.listenForChanges();
+    await initStartup();
+  }
 
   // Apply the color theme preference. "system" removes the attribute so the
   // prefers-color-scheme media query takes over; "light"/"dark" force it.
@@ -28,7 +32,8 @@
   });
 
   // New Window launches a fresh process; those skip restoring the last folder
-  // (and may open straight onto an empty buffer). The main process restores.
+  // (and may open straight onto an empty buffer). The main process applies the
+  // files.onLaunch preference.
   async function initStartup() {
     if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) {
       void workspace.restoreLastVault();
@@ -39,11 +44,26 @@
       if (opts.blank) {
         if (opts.untitled) workspace.openUntitled();
       } else {
-        await workspace.restoreLastVault();
+        await applyOnLaunch();
       }
     } catch {
       void workspace.restoreLastVault();
     }
+  }
+
+  /** Honor the files.onLaunch preference on a fresh (non-New-Window) start. */
+  async function applyOnLaunch() {
+    const mode = preferences.get<string>("files.onLaunch");
+    if (mode === "openNewFile") {
+      workspace.openUntitled();
+      return;
+    }
+    // Nothing to restore if recent tracking is off.
+    if (!preferences.get<boolean>("files.recordRecent")) return;
+    // "restoreFolders" reopens just the folder; the others also reopen the last file.
+    // (openCustomFolder falls back to full restore until a custom-folder path exists.)
+    const reopenFile = mode !== "restoreFolders";
+    await workspace.restoreLastVault(reopenFile);
   }
 
   function handleSave() {
