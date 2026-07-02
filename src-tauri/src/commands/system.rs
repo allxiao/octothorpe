@@ -3,6 +3,28 @@
 
 use crate::error::{AppError, AppResult};
 
+/// Classify a filesystem path for drag-and-drop routing: `"folder"`, `"markdown"`,
+/// `"image"`, or `"other"`. Errors if the path doesn't exist.
+#[tauri::command]
+pub fn path_kind(path: String) -> AppResult<String> {
+    let p = std::path::Path::new(&path);
+    let meta = std::fs::metadata(p)?;
+    if meta.is_dir() {
+        return Ok("folder".to_string());
+    }
+    let ext = p
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    let kind = match ext.as_str() {
+        "md" | "markdown" | "txt" => "markdown",
+        "png" | "jpg" | "jpeg" | "gif" | "webp" | "bmp" | "svg" => "image",
+        _ => "other",
+    };
+    Ok(kind.to_string())
+}
+
 /// Open a new Octothorpe window by spawning a fresh process. Each process owns its
 /// state (folder + index + watcher), so windows are fully independent. `--new-window`
 /// makes the child start without restoring the last folder; `--untitled` opens it

@@ -65,6 +65,19 @@ function readSidebarWidth(): number {
   return Number.isFinite(n) ? Math.max(180, Math.min(560, n)) : 260;
 }
 
+/** Last path segment (file or folder name) of an absolute path. */
+function baseName(path: string): string {
+  const parts = path.replace(/[\\/]+$/, "").split(/[\\/]/);
+  return parts[parts.length - 1] || path;
+}
+
+/** A space-safe `file:///` URL for an absolute path, for Markdown link/image
+ *  targets (the live-preview link/image regexes reject whitespace in URLs). */
+function fileUrl(path: string): string {
+  const fwd = path.replace(/\\/g, "/").replace(/^\/+/, "");
+  return "file:///" + encodeURI(fwd);
+}
+
 class Workspace {
   root = $state<string | null>(null);
   tree = $state<TreeNode[]>([]);
@@ -506,6 +519,16 @@ class Workspace {
     try {
       const path = await ipc.pickMarkdownPath();
       if (!path) return;
+      await this.openByPath(path);
+    } catch (e) {
+      this.status = `Open failed: ${e}`;
+    }
+  }
+
+  /** Open a file given its absolute path (vault doc if inside the open folder,
+   *  else standalone). Used by the file picker and drag-and-drop. */
+  async openByPath(path: string) {
+    try {
       const doc = await ipc.openPath(path);
       if (doc.relPath) {
         await this.openDoc(doc.relPath);
@@ -515,6 +538,34 @@ class Workspace {
     } catch (e) {
       this.status = `Open failed: ${e}`;
     }
+  }
+
+  /** Open a folder as the active vault (drag-and-drop / "Open in Octothorpe"). */
+  async openFolder(path: string) {
+    try {
+      await this.loadVault(path);
+    } catch (e) {
+      this.status = `Open folder failed: ${e}`;
+    }
+  }
+
+  /** Insert a Markdown link to a dropped file/folder at the cursor. */
+  insertLink(path: string) {
+    this.#insertAtCursor(`[${baseName(path)}](${fileUrl(path)})`);
+  }
+
+  /** Insert a Markdown image embed for a dropped image at the cursor. */
+  insertImage(path: string) {
+    this.#insertAtCursor(`![${baseName(path)}](${fileUrl(path)})`);
+  }
+
+  #insertAtCursor(text: string) {
+    if (!this.#editor) {
+      this.status = "Open a document to insert here";
+      return;
+    }
+    this.#editor.paste(text);
+    this.#editor.focus();
   }
 
   /** Show a file from outside the open folder as a standalone document. */

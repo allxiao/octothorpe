@@ -4,6 +4,9 @@ class UiState {
   /** Whether the Preferences modal is open. */
   preferencesOpen = $state(false);
 
+  /** Whether files are being dragged over the window (drop-target hint). */
+  dragOver = $state(false);
+
   openPreferences() {
     this.preferencesOpen = true;
   }

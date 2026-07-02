@@ -1,8 +1,9 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
   import { workspace } from "./lib/stores/workspace.svelte";
   import { ui } from "./lib/stores/ui.svelte";
   import { preferences } from "./lib/preferences/store.svelte";
+  import { initDragDrop } from "./lib/dragdrop";
   import * as ipc from "./lib/ipc/commands";
   import MenuBar from "./lib/components/MenuBar.svelte";
   import ActivityBar from "./lib/components/ActivityBar.svelte";
@@ -12,13 +13,23 @@
   import InsertTableModal from "./lib/components/InsertTableModal.svelte";
   import PreferencesModal from "./lib/components/PreferencesModal.svelte";
 
+  let unlistenDrop: (() => void) | null = null;
+
   onMount(() => {
     void boot();
   });
+  onDestroy(() => unlistenDrop?.());
 
   async function boot() {
     await preferences.load();
     void workspace.listenForChanges();
+    if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
+      try {
+        unlistenDrop = await initDragDrop();
+      } catch (e) {
+        console.error("[dragdrop] failed to initialize", e);
+      }
+    }
     await initStartup();
   }
 
@@ -163,6 +174,12 @@
   <PreferencesModal onClose={() => ui.closePreferences()} />
 {/if}
 
+{#if ui.dragOver}
+  <div class="drop-overlay">
+    <div class="drop-hint">Drop files to open or insert</div>
+  </div>
+{/if}
+
 <style>
   .app {
     display: flex;
@@ -235,5 +252,27 @@
     margin: 0 0.1em;
     border-radius: 4px;
     font-size: 0.95em;
+  }
+  /* Full-window hint while OS files are dragged over. pointer-events:none so it
+     never interferes with the native (OS-level) drop target. */
+  .drop-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--accent-soft);
+    border: 2px dashed var(--accent);
+  }
+  .drop-hint {
+    padding: 10px 18px;
+    border-radius: 8px;
+    background: var(--menu-bg, #fff);
+    border: 1px solid var(--border);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+    font-size: 14px;
+    font-weight: 500;
   }
 </style>

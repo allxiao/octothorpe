@@ -71,6 +71,10 @@ export const openUrl = (url: string) => invoke<void>("open_url", { url });
 /** Spawn a fresh Octothorpe window/process. `untitled` opens it on an empty buffer. */
 export const newWindow = (untitled = false) => invoke<void>("new_window", { untitled });
 
+/** Classify a filesystem path for drag-and-drop: "folder" | "markdown" | "image" | "other". */
+export const pathKind = (path: string) =>
+  invoke<"folder" | "markdown" | "image" | "other">("path_kind", { path });
+
 export interface StartupOptions {
   /** Launched as a New Window — skip restoring the last folder. */
   blank: boolean;

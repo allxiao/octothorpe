@@ -34,6 +34,7 @@ pub fn run() {
             commands::system::show_properties,
             commands::system::reveal_in_dir,
             commands::system::open_url,
+            commands::system::path_kind,
             commands::edit::markdown_to_html,
             commands::edit::markdown_to_plaintext,
             commands::edit::copy_image,
