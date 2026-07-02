@@ -28,7 +28,7 @@ interface ParsedTable extends TableModel {
 }
 
 const DELIM_RE = /^\s*\|?[\s:|-]*-[\s:|-]*\|?\s*$/;
-const isRowLine = (t: string) => t.includes("|") && t.trim() !== "";
+export const isRowLine = (t: string) => t.includes("|") && t.trim() !== "";
 
 /** Whether a line is a table delimiter row (`| --- | :--: |`). */
 export function isDelimiterRow(text: string): boolean {

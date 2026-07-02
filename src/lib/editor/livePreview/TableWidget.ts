@@ -374,8 +374,16 @@ export class TableWidget extends WidgetType {
     const st = view.state;
     const end = this.range(view).to;
     const endLine = st.doc.lineAt(Math.min(end, st.doc.length));
-    const target = endLine.number < st.doc.lines ? st.doc.line(endLine.number + 1).from : endLine.to;
-    view.dispatch({ selection: { anchor: target }, scrollIntoView: true });
+    if (endLine.number < st.doc.lines) {
+      view.dispatch({ selection: { anchor: st.doc.line(endLine.number + 1).from }, scrollIntoView: true });
+    } else {
+      // Table is the last element — add a line so the caret can leave downward.
+      view.dispatch({
+        changes: { from: endLine.to, insert: "\n" },
+        selection: { anchor: endLine.to + 1 },
+        scrollIntoView: true,
+      });
+    }
   }
 
   private appendRow(wrap: HTMLElement): HTMLElement {

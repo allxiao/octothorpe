@@ -10,20 +10,37 @@ import { COMMANDS } from "./commands";
 import { autoTable, enterTableUp, enterTableDown } from "./commands/table";
 import { autoCodeFence, codeFenceBackspace, codeLangDown, codeLangRight } from "./commands/block";
 import { FENCE_RE } from "./commands/code";
+import { isRowLine, isDelimiterRow } from "./commands/table";
 
 /**
- * Keep a caret-reachable line after a code block that ends the document: its
- * closing fence renders collapsed, so without a trailing line there'd be nowhere
- * below it to place the caret.
+ * Keep a caret-reachable line after a code block or table that ends the
+ * document: both render as collapsed/atomic blocks, so without a trailing line
+ * there'd be nowhere below them to place the caret.
  */
-const ensureLineAfterTrailingCode = EditorState.transactionFilter.of((tr) => {
+const ensureLineAfterTrailingBlock = EditorState.transactionFilter.of((tr) => {
   if (!tr.docChanged) return tr;
   const doc = tr.newDoc;
-  const last = doc.line(doc.lines);
-  if (!FENCE_RE.test(last.text)) return tr; // doesn't end on a fence
-  let fences = 0;
-  for (let n = 1; n <= doc.lines; n++) if (FENCE_RE.test(doc.line(n).text)) fences++;
-  if (fences % 2 !== 0) return tr; // trailing fence opens a block (still being typed)
+  const lastN = doc.lines;
+  const lastText = doc.line(lastN).text;
+  let needsLine = false;
+  if (FENCE_RE.test(lastText)) {
+    // Code fence: append only when it closes a block (even number of fences).
+    let fences = 0;
+    for (let n = 1; n <= lastN; n++) if (FENCE_RE.test(doc.line(n).text)) fences++;
+    needsLine = fences % 2 === 0;
+  } else if (isRowLine(lastText)) {
+    // GFM table: a contiguous run of rows ending the doc, with a delimiter row.
+    let top = lastN;
+    while (top > 1 && isRowLine(doc.line(top - 1).text)) top--;
+    let hasDelim = false;
+    for (let k = top; k <= lastN; k++)
+      if (isDelimiterRow(doc.line(k).text)) {
+        hasDelim = true;
+        break;
+      }
+    needsLine = hasDelim && lastN - top >= 1;
+  }
+  if (!needsLine) return tr;
   return [tr, { changes: { from: doc.length, insert: "\n" }, sequential: true }];
 });
 
@@ -108,7 +125,7 @@ export function baseExtensions(onSave?: () => void): Extension[] {
     bracketMatching(),
     syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
     markdownLang(),
-    ensureLineAfterTrailingCode,
+    ensureLineAfterTrailingBlock,
     EditorView.lineWrapping,
     keymap.of([
       {
