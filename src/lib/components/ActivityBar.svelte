@@ -22,10 +22,10 @@
   {#each views as v (v.id)}
     <button
       class="item"
-      class:active={workspace.activeView === v.id}
+      class:active={workspace.showSidebar && workspace.activeView === v.id}
       title={v.label}
       aria-label={v.label}
-      onclick={() => (workspace.activeView = v.id)}
+      onclick={() => workspace.toggleView(v.id)}
     >
       {@html v.icon}
     </button>

@@ -73,6 +73,8 @@ class Workspace {
   tagCount = $state(0);
 
   activeView = $state<ViewId>("explorer");
+  /** User collapsed the sidebar (via the active activity button). */
+  sidebarCollapsed = $state(false);
 
   /** View preferences (persisted). */
   pageWidth = $state<PageWidth>(readPageWidth());
@@ -121,9 +123,22 @@ class Workspace {
     return this.activeRelPath !== null || this.standalonePath !== null || this.untitled;
   }
 
-  /** The sidebar is shown only once a folder or a document is open. */
+  /** The sidebar shows once a folder or document is open, unless collapsed. */
   get showSidebar(): boolean {
-    return this.root !== null || this.hasDoc;
+    return (this.root !== null || this.hasDoc) && !this.sidebarCollapsed;
+  }
+
+  /**
+   * Activity-bar click: switch to `id` (revealing the sidebar), or collapse the
+   * sidebar when its already-active view is clicked again.
+   */
+  toggleView(id: ViewId) {
+    if (this.activeView === id && this.showSidebar) {
+      this.sidebarCollapsed = true;
+    } else {
+      this.activeView = id;
+      this.sidebarCollapsed = false;
+    }
   }
 
   /** Absolute path of the active document on disk, or null for an untitled buffer. */
@@ -389,6 +404,7 @@ class Workspace {
     this.content = "";
     this.clearTagFilter();
     this.activeView = "explorer";
+    this.sidebarCollapsed = false;
     await this.refresh();
     this.status = "";
     try {
@@ -470,6 +486,7 @@ class Workspace {
     this.dirty = false;
     this.externalChanged = false;
     if (!this.root) this.activeView = "outline";
+    this.sidebarCollapsed = false;
     void ipc.watchFile(path);
   }
 
@@ -483,6 +500,7 @@ class Workspace {
     this.dirty = false;
     this.externalChanged = false;
     if (!this.root) this.activeView = "outline";
+    this.sidebarCollapsed = false;
   }
 
   setContent(next: string) {
@@ -644,6 +662,7 @@ class Workspace {
   async selectTag(path: string) {
     this.filterTag = path;
     this.activeView = "tags";
+    this.sidebarCollapsed = false;
     try {
       this.filteredDocs = await ipc.documentsByTag(path);
     } catch (e) {
