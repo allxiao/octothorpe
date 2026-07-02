@@ -10,6 +10,13 @@ import { buildDecorations } from "./build";
 import { onTagClick } from "./config";
 import { tableField } from "./tableField";
 import { clearActiveTable } from "./TableWidget";
+import { openUrl } from "../../ipc/commands";
+
+/** Open a URL with the OS default handler (falls back to a tab in the browser). */
+function openExternal(url: string) {
+  if ("__TAURI_INTERNALS__" in window) void openUrl(url).catch(() => {});
+  else window.open(url, "_blank", "noopener");
+}
 
 /**
  * Live-preview ViewPlugin. Rebuilds decorations on document, viewport, or
@@ -261,11 +268,23 @@ const livePreviewTheme = EditorView.theme({
   ".cm-md-menu-sep": { height: "1px", background: "var(--border, #ccc)", margin: "4px 6px" },
 });
 
-// Clicking a tag pill notifies the host (e.g. to filter the sidebar), without
-// stealing the click — the caret still lands where you clicked.
-const tagClickHandler = EditorView.domEventHandlers({
+// Clicking a tag pill notifies the host (e.g. to filter the sidebar); Ctrl/Cmd
+// clicking a link opens it. Neither steals a plain click — the caret still lands
+// where you clicked.
+const interactionHandlers = EditorView.domEventHandlers({
   mousedown(event, view) {
     const target = event.target as HTMLElement | null;
+    // Ctrl/Cmd + click on a link opens it externally; a plain click falls
+    // through to normal caret placement (which reveals the source for editing).
+    const link = target?.closest?.(".cm-md-link");
+    if (link && (event.ctrlKey || event.metaKey)) {
+      const href = link.getAttribute("data-href");
+      if (href) {
+        event.preventDefault();
+        openExternal(href);
+        return true;
+      }
+    }
     const pill = target?.closest?.(".cm-md-tag");
     const tag = pill?.getAttribute("data-tag");
     if (tag) {
@@ -283,5 +302,5 @@ const tagClickHandler = EditorView.domEventHandlers({
 
 /** The full live-preview extension bundle. */
 export function livePreview(): Extension {
-  return [tableField, livePreviewPlugin, livePreviewTheme, tagClickHandler];
+  return [tableField, livePreviewPlugin, livePreviewTheme, interactionHandlers];
 }

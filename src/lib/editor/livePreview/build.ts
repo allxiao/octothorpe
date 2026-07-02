@@ -209,17 +209,23 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
           return;
         }
 
-        // --- Links: show only the text, hide brackets + URL ---
+        // --- Links: show only the text, hide brackets + URL. The rendered text
+        //     carries the URL (for Ctrl/Cmd+click) and any title (hover tooltip). ---
         if (name === "Link") {
           if (!isElementActive(state, node.from, node.to)) {
             const raw = slice(node.from, node.to);
-            const m = /^\[([^\]]*)\]\([^)]*\)$/.exec(raw);
+            // [text](url) or [text](url "title")
+            const m = /^\[([^\]]*)\]\(\s*(\S+?)(?:\s+"([^"]*)")?\s*\)$/.exec(raw);
             if (m) {
               const textStart = node.from + 1;
               const textEnd = textStart + m[1].length;
               hide(node.from, textStart); // '['
-              hide(textEnd, node.to); // '](url)'
-              mark(textStart, textEnd, "cm-md-link");
+              hide(textEnd, node.to); // '](url ...)'
+              const attributes: Record<string, string> = { "data-href": m[2] };
+              if (m[3]) attributes.title = m[3];
+              decos.push(
+                Decoration.mark({ class: "cm-md-link", attributes }).range(textStart, textEnd),
+              );
             }
           }
           return;
