@@ -256,6 +256,28 @@ const livePreviewTheme = EditorView.theme({
   ".cm-md-linkref-label": { opacity: "0.45" },
   ".cm-md-linkref-title": { opacity: "0.45" },
   ".cm-md-linkref-ph": { opacity: "0.4", fontStyle: "italic" },
+  // Browser-style hovered-link address, bottom-left of the editor.
+  ".cm-md-link-status": {
+    position: "absolute",
+    bottom: "0",
+    left: "0",
+    zIndex: "10",
+    maxWidth: "70%",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    padding: "2px 8px",
+    fontSize: "11px",
+    fontFamily: "system-ui, sans-serif",
+    color: "var(--text, #333)",
+    background: "var(--menu-bg, #fff)",
+    border: "1px solid var(--border, #ccc)",
+    borderLeft: "none",
+    borderBottom: "none",
+    borderTopRightRadius: "4px",
+    boxShadow: "0 -1px 4px rgba(0, 0, 0, 0.08)",
+    pointerEvents: "none",
+  },
   ".cm-md-image": { maxWidth: "100%", borderRadius: "4px" },
   // Alone on a line: block, and collapse the line to the image height (the line
   // otherwise keeps its text strut + CM's cursor-buffer images).
@@ -402,7 +424,47 @@ const interactionHandlers = EditorView.domEventHandlers({
   },
 });
 
+// Browser-style link-address indicator: hovering a link shows its URL in a small
+// label pinned to the bottom-left of the editor.
+const linkStatusPlugin = ViewPlugin.fromClass(
+  class {
+    el: HTMLDivElement;
+    constructor(view: EditorView) {
+      this.el = document.createElement("div");
+      this.el.className = "cm-md-link-status";
+      this.el.style.display = "none";
+      view.dom.appendChild(this.el);
+    }
+    destroy() {
+      this.el.remove();
+    }
+  },
+  {
+    eventHandlers: {
+      mouseover(event) {
+        const link = (event.target as HTMLElement | null)?.closest?.(".cm-md-link");
+        const href = link?.getAttribute("data-href");
+        if (href) {
+          this.el.textContent = href;
+          this.el.style.display = "block";
+        }
+      },
+      mouseout(event) {
+        const to = event.relatedTarget as HTMLElement | null;
+        if (!to?.closest?.(".cm-md-link")) this.el.style.display = "none";
+      },
+    },
+  },
+);
+
 /** The full live-preview extension bundle. */
 export function livePreview(): Extension {
-  return [linkRefsField, tableField, livePreviewPlugin, livePreviewTheme, interactionHandlers];
+  return [
+    linkRefsField,
+    tableField,
+    livePreviewPlugin,
+    livePreviewTheme,
+    interactionHandlers,
+    linkStatusPlugin,
+  ];
 }
