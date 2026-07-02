@@ -73,8 +73,12 @@ class Workspace {
   tagCount = $state(0);
 
   activeView = $state<ViewId>("explorer");
-  /** User collapsed the sidebar (via the active activity button). */
-  sidebarCollapsed = $state(false);
+  /**
+   * Explicit sidebar visibility from the activity bar: `null` follows content
+   * (shown once a folder or document is open); `true`/`false` force it either
+   * way, so a button click can reveal the sidebar even when nothing is open.
+   */
+  sidebarOverride = $state<boolean | null>(null);
 
   /** View preferences (persisted). */
   pageWidth = $state<PageWidth>(readPageWidth());
@@ -123,21 +127,22 @@ class Workspace {
     return this.activeRelPath !== null || this.standalonePath !== null || this.untitled;
   }
 
-  /** The sidebar shows once a folder or document is open, unless collapsed. */
+  /** The sidebar follows content unless the activity bar forced it open/closed. */
   get showSidebar(): boolean {
-    return (this.root !== null || this.hasDoc) && !this.sidebarCollapsed;
+    return this.sidebarOverride ?? (this.root !== null || this.hasDoc);
   }
 
   /**
-   * Activity-bar click: switch to `id` (revealing the sidebar), or collapse the
-   * sidebar when its already-active view is clicked again.
+   * Activity-bar click: switch to `id` and reveal the sidebar, or collapse it
+   * when its already-active view is clicked again. Revealing works regardless
+   * of what's open — an empty view is shown when there's no content.
    */
   toggleView(id: ViewId) {
     if (this.activeView === id && this.showSidebar) {
-      this.sidebarCollapsed = true;
+      this.sidebarOverride = false;
     } else {
       this.activeView = id;
-      this.sidebarCollapsed = false;
+      this.sidebarOverride = true;
     }
   }
 
@@ -404,7 +409,7 @@ class Workspace {
     this.content = "";
     this.clearTagFilter();
     this.activeView = "explorer";
-    this.sidebarCollapsed = false;
+    this.sidebarOverride = null;
     await this.refresh();
     this.status = "";
     try {
@@ -486,7 +491,7 @@ class Workspace {
     this.dirty = false;
     this.externalChanged = false;
     if (!this.root) this.activeView = "outline";
-    this.sidebarCollapsed = false;
+    this.sidebarOverride = null;
     void ipc.watchFile(path);
   }
 
@@ -500,7 +505,7 @@ class Workspace {
     this.dirty = false;
     this.externalChanged = false;
     if (!this.root) this.activeView = "outline";
-    this.sidebarCollapsed = false;
+    this.sidebarOverride = null;
   }
 
   setContent(next: string) {
@@ -662,7 +667,7 @@ class Workspace {
   async selectTag(path: string) {
     this.filterTag = path;
     this.activeView = "tags";
-    this.sidebarCollapsed = false;
+    this.sidebarOverride = null;
     try {
       this.filteredDocs = await ipc.documentsByTag(path);
     } catch (e) {
