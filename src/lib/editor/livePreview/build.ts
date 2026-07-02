@@ -5,8 +5,16 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import { isElementActive, isLineActive } from "./reveal";
 import { imageBaseDir } from "./config";
 import { scanTagsInLine } from "./tagScan";
-import { ImageWidget, HrWidget, BulletWidget, CheckboxWidget, CodeLangWidget } from "./widgets";
+import {
+  ImageWidget,
+  HrWidget,
+  BulletWidget,
+  CheckboxWidget,
+  CodeLangWidget,
+  PlaceholderWidget,
+} from "./widgets";
 import { tableRanges } from "./tableField";
+import { resolveLinkRef } from "./linkRefs";
 
 /**
  * Resolve a Markdown image URL to something the webview can load. Remote and
@@ -94,6 +102,46 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
   // must skip them so `#define` / `#000` inside code don't become tag pills.
   const codeRanges: { from: number; to: number }[] = [];
   const inCode = (pos: number) => codeRanges.some((r) => pos >= r.from && pos <= r.to);
+
+  // Render a link reference definition line (`[id]: url "title"`): dim the
+  // `[id]:` label, show the URL as a clickable link, and dim the title. Empty
+  // URL/title slots get a placeholder that disappears once real text is typed
+  // (the URL placeholder always shows; the optional-title one only while the
+  // line is being edited).
+  const LINK_DEF_RE = /^(\s*)\[([^\]]*)\]:([ \t]*)(\S*)([ \t]*)(.*)$/;
+  const renderLinkDef = (line: { from: number; to: number; text: string }, m: RegExpExecArray) => {
+    const indent = m[1].length;
+    const labelEnd = line.from + indent + m[2].length + 3; // past `[label]:`
+    mark(line.from + indent, labelEnd, "cm-md-linkref-label");
+    const urlStart = labelEnd + m[3].length;
+    const urlEnd = urlStart + m[4].length;
+    if (m[4]) {
+      decos.push(
+        Decoration.mark({ class: "cm-md-link", attributes: { "data-href": m[4] } }).range(
+          urlStart,
+          urlEnd,
+        ),
+      );
+    } else {
+      decos.push(
+        Decoration.widget({
+          widget: new PlaceholderWidget("input link url here", "cm-md-linkref-ph"),
+          side: 1,
+        }).range(urlStart),
+      );
+    }
+    const titleStart = urlEnd + m[5].length;
+    if (m[6]) {
+      mark(titleStart, titleStart + m[6].length, "cm-md-linkref-title");
+    } else if (isLineActive(state, line.from, line.to)) {
+      decos.push(
+        Decoration.widget({
+          widget: new PlaceholderWidget(' "title (optional)"', "cm-md-linkref-ph"),
+          side: 1,
+        }).range(titleStart),
+      );
+    }
+  };
 
   for (const { from, to } of view.visibleRanges) {
     syntaxTree(state).iterate({
@@ -209,23 +257,54 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
           return;
         }
 
-        // --- Links: show only the text, hide brackets + URL. The rendered text
-        //     carries the URL (for Ctrl/Cmd+click) and any title (hover tooltip). ---
+        // --- Links: inline `[text](url)` and reference `[text][id]` /
+        //     `[text][]`. The rendered text carries the resolved URL (Ctrl/Cmd+
+        //     click) and any title. A reference whose definition is missing is
+        //     still rendered as a link, flagged with `data-missing` so Ctrl+click
+        //     can scaffold the definition. ---
         if (name === "Link") {
           if (!isElementActive(state, node.from, node.to)) {
             const raw = slice(node.from, node.to);
-            // [text](url) or [text](url "title")
-            const m = /^\[([^\]]*)\]\(\s*(\S+?)(?:\s+"([^"]*)")?\s*\)$/.exec(raw);
-            if (m) {
+            const inline = /^\[([^\]]*)\]\(\s*(\S+?)(?:\s+"([^"]*)")?\s*\)$/.exec(raw);
+            if (inline) {
               const textStart = node.from + 1;
-              const textEnd = textStart + m[1].length;
+              const textEnd = textStart + inline[1].length;
               hide(node.from, textStart); // '['
-              hide(textEnd, node.to); // '](url ...)'
-              const attributes: Record<string, string> = { "data-href": m[2] };
-              if (m[3]) attributes.title = m[3];
+              hide(textEnd, node.to); // '](url)'
+              const attributes: Record<string, string> = { "data-href": inline[2] };
+              if (inline[3]) attributes.title = inline[3];
               decos.push(
                 Decoration.mark({ class: "cm-md-link", attributes }).range(textStart, textEnd),
               );
+            } else {
+              // Full reference `[text][id]` or implicit `[text][]`.
+              const ref = /^\[([^\]]*)\]\[([^\]]*)\]$/.exec(raw);
+              if (ref) {
+                const text = ref[1];
+                const label = ref[2].trim() ? ref[2] : text;
+                const resolved = resolveLinkRef(state, label);
+                const textStart = node.from + 1;
+                const textEnd = textStart + text.length;
+                hide(node.from, textStart); // '['
+                hide(textEnd, node.to); // '][id]'
+                if (resolved) {
+                  const attributes: Record<string, string> = { "data-href": resolved.url };
+                  if (resolved.title) attributes.title = resolved.title;
+                  decos.push(
+                    Decoration.mark({ class: "cm-md-link", attributes }).range(textStart, textEnd),
+                  );
+                } else {
+                  decos.push(
+                    Decoration.mark({
+                      class: "cm-md-link cm-md-link-missing",
+                      attributes: {
+                        "data-missing": label,
+                        title: "Missing link reference — Ctrl-click to add a definition",
+                      },
+                    }).range(textStart, textEnd),
+                  );
+                }
+              }
             }
           }
           return;
@@ -342,6 +421,14 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
     for (; ln <= lastLn; ln++) {
       const line = state.doc.line(ln);
       if (inTable(line.from) || inCode(line.from)) continue;
+      // Link reference definition line — styled, with placeholders for empty
+      // URL/title. (Handled here, not in the tree walk, because an empty
+      // `[id]:` isn't a LinkReference node.) Such lines carry no tags.
+      const def = LINK_DEF_RE.exec(line.text);
+      if (def && def[2].trim()) {
+        renderLinkDef(line, def);
+        continue;
+      }
       for (const t of scanTagsInLine(line.text)) {
         decos.push(
           Decoration.mark({

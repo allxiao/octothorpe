@@ -9,6 +9,7 @@ import type { Extension } from "@codemirror/state";
 import { buildDecorations } from "./build";
 import { onTagClick } from "./config";
 import { tableField } from "./tableField";
+import { linkRefsField } from "./linkRefs";
 import { clearActiveTable } from "./TableWidget";
 import { openUrl } from "../../ipc/commands";
 
@@ -16,6 +17,38 @@ import { openUrl } from "../../ipc/commands";
 function openExternal(url: string) {
   if ("__TAURI_INTERNALS__" in window) void openUrl(url).catch(() => {});
   else window.open(url, "_blank", "noopener");
+}
+
+/**
+ * Ctrl/Cmd+click on a reference link whose definition is missing: jump to an
+ * existing (possibly empty) `[label]:` line if there is one, otherwise scaffold
+ * a stub at the end of the document with the caret ready to type the URL.
+ */
+function createOrGotoDef(view: EditorView, label: string) {
+  const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
+  const key = norm(label);
+  const doc = view.state.doc;
+  for (let n = 1; n <= doc.lines; n++) {
+    const line = doc.line(n);
+    const m = /^\s*\[([^\]]*)\]:/.exec(line.text);
+    if (m && norm(m[1]) === key) {
+      view.focus();
+      view.dispatch({ selection: { anchor: line.to }, scrollIntoView: true });
+      return;
+    }
+  }
+  const s = doc.toString();
+  // A definition that directly follows a paragraph is treated as paragraph
+  // text, so make sure a blank line precedes it.
+  const prefix = s.length === 0 ? "" : s.endsWith("\n\n") ? "" : s.endsWith("\n") ? "\n" : "\n\n";
+  const stub = `${prefix}[${label}]: `;
+  const at = doc.length;
+  view.focus();
+  view.dispatch({
+    changes: { from: at, insert: stub },
+    selection: { anchor: at + stub.length },
+    scrollIntoView: true,
+  });
 }
 
 /**
@@ -161,6 +194,22 @@ const livePreviewTheme = EditorView.theme({
   },
   ".cm-md-strike": { textDecoration: "line-through", opacity: "0.7" },
   ".cm-md-link": { color: "#3b82f6", textDecoration: "underline", cursor: "pointer" },
+  // A reference link with no matching definition: dashed underline + a small
+  // amber "?" marker at its right end.
+  ".cm-md-link-missing": { textDecorationStyle: "dashed" },
+  ".cm-md-link-missing::after": {
+    content: '"?"',
+    fontSize: "0.7em",
+    verticalAlign: "super",
+    fontWeight: "700",
+    color: "#f59e0b",
+    marginLeft: "1px",
+  },
+  // Link reference definitions (`[id]: url "title"`): dim the label/colon/title,
+  // and show italic placeholders where the URL/title are still empty.
+  ".cm-md-linkref-label": { opacity: "0.45" },
+  ".cm-md-linkref-title": { opacity: "0.45" },
+  ".cm-md-linkref-ph": { opacity: "0.4", fontStyle: "italic" },
   ".cm-md-image": { maxWidth: "100%", borderRadius: "4px" },
   // Alone on a line: block, and collapse the line to the image height (the line
   // otherwise keeps its text strut + CM's cursor-buffer images).
@@ -284,6 +333,12 @@ const interactionHandlers = EditorView.domEventHandlers({
         openExternal(href);
         return true;
       }
+      const missing = link.getAttribute("data-missing");
+      if (missing != null) {
+        event.preventDefault();
+        createOrGotoDef(view, missing);
+        return true;
+      }
     }
     const pill = target?.closest?.(".cm-md-tag");
     const tag = pill?.getAttribute("data-tag");
@@ -302,5 +357,5 @@ const interactionHandlers = EditorView.domEventHandlers({
 
 /** The full live-preview extension bundle. */
 export function livePreview(): Extension {
-  return [tableField, livePreviewPlugin, livePreviewTheme, interactionHandlers];
+  return [linkRefsField, tableField, livePreviewPlugin, livePreviewTheme, interactionHandlers];
 }

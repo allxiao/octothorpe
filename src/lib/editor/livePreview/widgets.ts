@@ -103,6 +103,30 @@ export class CheckboxWidget extends WidgetType {
   }
 }
 
+/** A dimmed, non-editable placeholder (e.g. the empty URL/title of a link
+ * reference definition). Purely visual — it vanishes as soon as real text is
+ * typed at its position and the decoration rebuilds. */
+export class PlaceholderWidget extends WidgetType {
+  constructor(
+    readonly text: string,
+    readonly cls: string,
+  ) {
+    super();
+  }
+  eq(other: PlaceholderWidget) {
+    return other.text === this.text && other.cls === this.cls;
+  }
+  toDOM() {
+    const s = document.createElement("span");
+    s.className = this.cls;
+    s.textContent = this.text;
+    return s;
+  }
+  ignoreEvent() {
+    return true;
+  }
+}
+
 /** Known language names, for the picker's suggestion list. */
 const LANG_NAMES = languages.map((l) => l.name);
 

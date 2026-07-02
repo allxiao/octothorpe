@@ -44,6 +44,23 @@ const ensureLineAfterTrailingBlock = EditorState.transactionFilter.of((tr) => {
   return [tr, { changes: { from: doc.length, insert: "\n" }, sequential: true }];
 });
 
+// On a link reference definition line `[name]: url `, typing the first title
+// character after the URL's trailing space auto-wraps it in quotes, leaving the
+// caret inside — so `… url ` + `T` becomes `… url "T|"`.
+const DEF_AWAITING_TITLE = /^\s*\[[^\]]*\]:[ \t]*\S+[ \t]+$/;
+const autoQuoteRefTitle = EditorView.inputHandler.of((view, from, to, text) => {
+  if (from !== to || text.length !== 1 || text === '"' || /\s/.test(text)) return false;
+  const line = view.state.doc.lineAt(from);
+  if (from !== line.to || !DEF_AWAITING_TITLE.test(line.text)) return false;
+  view.dispatch({
+    changes: { from, insert: `"${text}"` },
+    selection: { anchor: from + 1 + text.length },
+    scrollIntoView: true,
+    userEvent: "input.type",
+  });
+  return true;
+});
+
 // Paragraph-menu keybindings (editor-scoped). Placed before defaultKeymap so
 // list Indent/Outdent override CodeMirror's Mod-]/Mod-[.
 const PARAGRAPH_KEYS: { key: string; id: string }[] = [
@@ -126,6 +143,7 @@ export function baseExtensions(onSave?: () => void): Extension[] {
     syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
     markdownLang(),
     ensureLineAfterTrailingBlock,
+    autoQuoteRefTitle,
     EditorView.lineWrapping,
     keymap.of([
       {
