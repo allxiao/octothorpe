@@ -37,7 +37,7 @@
           { id: "notes", title: notesTitle, snip: notesSnip },
         ];
       default:
-        return [{ id: "outline-only", title: "Outline", snip: outlineSnip }];
+        return [];
     }
   });
 
@@ -110,7 +110,10 @@
 <aside class="sidebar" style="width: {workspace.sidebarWidth}px">
   <div class="view-header">{titles[workspace.activeView]}</div>
 
-  {#if !workspace.root && workspace.activeView !== "outline"}
+  {#if workspace.activeView === "outline"}
+    <!-- Single view: the view-header already says "Outline", so skip the panel header. -->
+    <div class="single"><Outline /></div>
+  {:else if !workspace.root}
     <div class="hint">No folder open. Use <strong>File ▸ Open Folder</strong>.</div>
   {:else if workspace.activeView === "search"}
     <div class="search-wrap"><Search /></div>
@@ -218,6 +221,12 @@
     flex: 1 1 auto;
     min-height: 0;
     display: flex;
+  }
+  .single {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding-bottom: 6px;
   }
   .notes {
     display: flex;
