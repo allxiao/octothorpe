@@ -72,6 +72,9 @@ export function seedIfBrowser() {
   const hasTauri = "__TAURI_INTERNALS__" in window;
   if (hasTauri) return;
 
+  // Expose the store so the browser preview can drive states for inspection.
+  (window as unknown as { __ws: typeof workspace }).__ws = workspace;
+
   workspace.root = "C:/Code/octothorpe-sample-vault";
   workspace.tree = tree;
   workspace.tags = tags;

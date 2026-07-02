@@ -121,6 +121,11 @@ class Workspace {
     return this.activeRelPath !== null || this.standalonePath !== null || this.untitled;
   }
 
+  /** The sidebar is shown only once a folder or a document is open. */
+  get showSidebar(): boolean {
+    return this.root !== null || this.hasDoc;
+  }
+
   /** Absolute path of the active document on disk, or null for an untitled buffer. */
   get activeAbsPath(): string | null {
     if (this.standalonePath) return this.standalonePath;
@@ -383,6 +388,7 @@ class Workspace {
     this.untitled = false;
     this.content = "";
     this.clearTagFilter();
+    this.activeView = "explorer";
     await this.refresh();
     this.status = "";
     try {
@@ -463,6 +469,7 @@ class Workspace {
     this.content = content;
     this.dirty = false;
     this.externalChanged = false;
+    if (!this.root) this.activeView = "outline";
     void ipc.watchFile(path);
   }
 
@@ -475,6 +482,7 @@ class Workspace {
     this.content = "";
     this.dirty = false;
     this.externalChanged = false;
+    if (!this.root) this.activeView = "outline";
   }
 
   setContent(next: string) {

@@ -72,7 +72,9 @@
   <MenuBar />
   <div class="body">
     <ActivityBar />
-    <Sidebar />
+    {#if workspace.showSidebar}
+      <Sidebar />
+    {/if}
     <div class="editor-area">
       {#if workspace.hasDoc}
         <main class="editor-pane">

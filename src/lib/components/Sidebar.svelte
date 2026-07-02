@@ -110,7 +110,7 @@
 <aside class="sidebar" style="width: {workspace.sidebarWidth}px">
   <div class="view-header">{titles[workspace.activeView]}</div>
 
-  {#if !workspace.root}
+  {#if !workspace.root && workspace.activeView !== "outline"}
     <div class="hint">No folder open. Use <strong>File ▸ Open Folder</strong>.</div>
   {:else if workspace.activeView === "search"}
     <div class="search-wrap"><Search /></div>
