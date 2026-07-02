@@ -119,3 +119,11 @@ export const markdownToPlaintext = (markdown: string) =>
   invoke<string>("markdown_to_plaintext", { markdown });
 /** Copy a local image file's pixels to the system clipboard. */
 export const copyImage = (src: string) => invoke<void>("copy_image", { src });
+
+// --- Preferences ----------------------------------------------------------
+
+/** Read the raw ~/.octothorpe/preferences.json (or a default when absent). */
+export const readPreferences = () => invoke<string>("read_preferences");
+/** Write the raw preferences JSON to ~/.octothorpe/preferences.json. */
+export const writePreferences = (content: string) =>
+  invoke<void>("write_preferences", { content });

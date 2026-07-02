@@ -37,6 +37,8 @@ pub fn run() {
             commands::edit::markdown_to_html,
             commands::edit::markdown_to_plaintext,
             commands::edit::copy_image,
+            commands::preferences::read_preferences,
+            commands::preferences::write_preferences,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

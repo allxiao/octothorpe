@@ -3,5 +3,6 @@
 
 pub mod documents;
 pub mod edit;
+pub mod preferences;
 pub mod system;
 pub mod vault;
