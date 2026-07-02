@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "octothorpe://preferences/v1",
+  "title": "Octothorpe Preferences",
+  "type": "object",
+  "additionalProperties": false,
+  "x-ui": {
+    "categories": [
+      { "id": "editor", "label": "Editor" },
+      { "id": "appearance", "label": "Appearance" },
+      { "id": "files", "label": "Files" }
+    ]
+  },
+  "properties": {
+    "version": {
+      "type": "integer",
+      "description": "Schema version the settings were written against.",
+      "x-ui": { "hidden": true }
+    },
+    "editor": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "fontSize": {
+          "type": "integer",
+          "default": 15,
+          "minimum": 8,
+          "maximum": 40,
+          "title": "Font Size",
+          "description": "Editor font size, in pixels.",
+          "x-ui": { "category": "editor", "section": "Font", "control": "number", "order": 1 }
+        },
+        "lineHeight": {
+          "type": "number",
+          "default": 1.6,
+          "minimum": 1.0,
+          "maximum": 2.5,
+          "title": "Line Height",
+          "description": "Vertical spacing between lines, as a multiple of the font size.",
+          "x-ui": { "category": "editor", "section": "Font", "control": "number", "step": 0.1, "order": 2 }
+        },
+        "wordWrap": {
+          "type": "boolean",
+          "default": true,
+          "title": "Word Wrap",
+          "description": "Wrap long lines to the editor width instead of scrolling horizontally.",
+          "x-ui": { "category": "editor", "section": "Behavior", "control": "toggle", "order": 1 }
+        }
+      }
+    },
+    "appearance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "theme": {
+          "type": "string",
+          "default": "system",
+          "enum": ["system", "light", "dark"],
+          "title": "Theme",
+          "description": "Color theme. \"System\" follows the operating system setting.",
+          "x-ui": {
+            "category": "appearance",
+            "section": "Theme",
+            "control": "select",
+            "order": 1,
+            "options": [
+              { "value": "system", "label": "Follow System" },
+              { "value": "light", "label": "Light" },
+              { "value": "dark", "label": "Dark" }
+            ]
+          }
+        }
+      }
+    },
+    "files": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "defaultExtension": {
+          "type": "string",
+          "default": ".md",
+          "enum": [".md", ".markdown", ".txt"],
+          "title": "Default File Type / Extension",
+          "description": "Extension used when creating new documents.",
+          "x-ui": {
+            "category": "files",
+            "section": "New Documents",
+            "control": "select",
+            "order": 1,
+            "options": [
+              { "value": ".md", "label": "Markdown (.md)" },
+              { "value": ".markdown", "label": "Markdown (.markdown)" },
+              { "value": ".txt", "label": "Plain Text (.txt)" }
+            ]
+          }
+        }
+      }
+    }
+  }
+}
