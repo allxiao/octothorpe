@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { workspace } from "./lib/stores/workspace.svelte";
+  import { ui } from "./lib/stores/ui.svelte";
+  import { preferences } from "./lib/preferences/store.svelte";
   import * as ipc from "./lib/ipc/commands";
   import MenuBar from "./lib/components/MenuBar.svelte";
   import ActivityBar from "./lib/components/ActivityBar.svelte";
@@ -8,10 +10,21 @@
   import StatusBar from "./lib/components/StatusBar.svelte";
   import EditorHost from "./lib/editor/EditorHost.svelte";
   import InsertTableModal from "./lib/components/InsertTableModal.svelte";
+  import PreferencesModal from "./lib/components/PreferencesModal.svelte";
 
   onMount(() => {
+    void preferences.load();
     void workspace.listenForChanges();
     void initStartup();
+  });
+
+  // Apply the color theme preference. "system" removes the attribute so the
+  // prefers-color-scheme media query takes over; "light"/"dark" force it.
+  $effect(() => {
+    const theme = preferences.get<string>("appearance.theme");
+    const el = document.documentElement;
+    if (theme === "light" || theme === "dark") el.dataset.theme = theme;
+    else delete el.dataset.theme;
   });
 
   // New Window launches a fresh process; those skip restoring the last folder
@@ -62,6 +75,9 @@
     } else if (k === "w") {
       e.preventDefault();
       void ipc.closeWindow();
+    } else if (k === ",") {
+      e.preventDefault();
+      ui.openPreferences();
     }
   }
 </script>
@@ -121,6 +137,10 @@
     onConfirm={(cols, rows) => workspace.confirmInsertTable(cols, rows)}
     onCancel={() => workspace.cancelInsertTable()}
   />
+{/if}
+
+{#if ui.preferencesOpen}
+  <PreferencesModal onClose={() => ui.closePreferences()} />
 {/if}
 
 <style>

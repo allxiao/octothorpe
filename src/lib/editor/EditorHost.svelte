@@ -18,6 +18,7 @@
   } from "./commands";
   import { focusTableCell } from "./commands/table";
   import type { EditorApi } from "../stores/workspace.svelte";
+  import { preferences } from "../preferences/store.svelte";
 
   let {
     content = "",
@@ -42,6 +43,22 @@
   const baseDirComp = new Compartment();
   // Toggles the live-preview layer for source-code mode.
   const livePreviewComp = new Compartment();
+  // Editor typography (font size / line height) driven by preferences.
+  const typographyComp = new Compartment();
+  // Word-wrap toggle driven by preferences.
+  const wrapComp = new Compartment();
+
+  const editorPrefs = preferences.scope("editor");
+
+  /** A CodeMirror theme carrying the preference-driven editor typography. */
+  function typographyTheme() {
+    return EditorView.theme({
+      ".cm-scroller": {
+        fontSize: `${editorPrefs.get<number>("fontSize")}px`,
+        lineHeight: String(editorPrefs.get<number>("lineHeight")),
+      },
+    });
+  }
   // Marks a programmatic document reset (opening a file / new buffer) so it
   // isn't reported as a user edit.
   const External = Annotation.define<boolean>();
@@ -169,6 +186,8 @@
       extensions: [
         ...baseExtensions(saveWithFlush),
         livePreviewComp.of(sourceMode ? [] : livePreview()),
+        typographyComp.of(typographyTheme()),
+        wrapComp.of(editorPrefs.get<boolean>("wordWrap") ? EditorView.lineWrapping : []),
         baseDirComp.of(imageBaseDir.of(baseDir)),
         onTagClick.of((tag) => ontagclick?.(tag)),
         EditorView.updateListener.of((u) => {
@@ -240,6 +259,21 @@
       view.dispatch({ effects: livePreviewComp.reconfigure(sm ? [] : livePreview()) });
     }
   });
+
+  // Live-refresh editor typography when the font-size / line-height preferences change.
+  $effect(() => {
+    editorPrefs.get<number>("fontSize");
+    editorPrefs.get<number>("lineHeight");
+    if (view) view.dispatch({ effects: typographyComp.reconfigure(typographyTheme()) });
+  });
+
+  // Live-refresh word wrap when the preference changes.
+  $effect(() => {
+    const wrap = editorPrefs.get<boolean>("wordWrap");
+    if (view) {
+      view.dispatch({ effects: wrapComp.reconfigure(wrap ? EditorView.lineWrapping : []) });
+    }
+  });
 </script>
 
 <div class="editor" bind:this={host}></div>
@@ -254,8 +288,7 @@
   }
   .editor :global(.cm-scroller) {
     font-family: var(--editor-font);
-    font-size: 15px;
-    line-height: 1.6;
+    /* font-size and line-height are driven by preferences via typographyComp. */
   }
   .editor :global(.cm-content) {
     max-width: var(--editor-max-width, 860px);

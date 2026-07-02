@@ -1,5 +1,6 @@
 <script lang="ts">
   import { workspace } from "../stores/workspace.svelte";
+  import { ui } from "../stores/ui.svelte";
   import * as ipc from "../ipc/commands";
 
   let open = $state<string | null>(null);
@@ -121,6 +122,10 @@
           onclick={() => run(() => workspace.deleteActive())}
         >
           Delete…
+        </button>
+        <div class="sep"></div>
+        <button role="menuitem" onclick={() => run(() => ui.openPreferences())}>
+          Preferences…<span class="key">Ctrl+,</span>
         </button>
         <div class="sep"></div>
         <button role="menuitem" onclick={() => run(() => ipc.closeWindow())}>

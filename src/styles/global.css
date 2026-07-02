@@ -15,7 +15,8 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  /* Follow the OS only when the user hasn't forced a theme (appearance.theme). */
+  :root:not([data-theme]) {
     --border: #2c2c30;
     --toolbar-bg: #1c1c1f;
     --sidebar-bg: #19191c;
@@ -25,6 +26,24 @@
     --button-hover-bg: #2e2e33;
     --accent-soft: rgba(59, 130, 246, 0.25);
   }
+}
+
+/* Explicit dark theme (appearance.theme = "dark"). */
+:root[data-theme="dark"] {
+  --border: #2c2c30;
+  --toolbar-bg: #1c1c1f;
+  --sidebar-bg: #19191c;
+  --activitybar-bg: #19191c;
+  --menu-bg: #242428;
+  --button-bg: #242428;
+  --button-hover-bg: #2e2e33;
+  --accent-soft: rgba(59, 130, 246, 0.25);
+  color-scheme: dark;
+}
+
+/* Explicit light theme (appearance.theme = "light") — base palette + forced scheme. */
+:root[data-theme="light"] {
+  color-scheme: light;
 }
 
 * {

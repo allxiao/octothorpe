@@ -144,7 +144,6 @@ export function baseExtensions(onSave?: () => void): Extension[] {
     markdownLang(),
     ensureLineAfterTrailingBlock,
     autoQuoteRefTitle,
-    EditorView.lineWrapping,
     keymap.of([
       {
         key: "Mod-s",
