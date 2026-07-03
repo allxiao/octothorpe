@@ -248,14 +248,20 @@ const livePreviewTheme = EditorView.theme({
   ".cm-md-strike": { textDecoration: "line-through", opacity: "0.7" },
   // Inline math rendered in place of `$…$`.
   ".cm-md-inline-math": { cursor: "text", padding: "0 0.1em" },
-  // Idle block render (caret outside a `$$` / ```math block). No special
-  // background — it reads like normal document content, just centered math.
+  // Idle block render (caret outside a `$$` / ```math block). No background at
+  // rest so it reads like normal content; on hover a subtle box + a "Math" hint
+  // appear to signal it's editable math.
   ".cm-md-math-block": {
     position: "relative",
     margin: "0.4em 0",
-    padding: "0.2em 0",
+    padding: "0.3em 0.8em",
     overflowX: "auto",
     cursor: "text",
+    borderRadius: "6px",
+    transition: "background 0.1s",
+  },
+  ".cm-md-math-block:hover": {
+    background: "var(--code-block-bg, rgba(135, 131, 120, 0.1))",
   },
   // Small "Math" hint shown at the top-right of an idle render on hover.
   ".cm-md-math-hint": {
