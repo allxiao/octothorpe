@@ -250,11 +250,12 @@ const livePreviewTheme = EditorView.theme({
   ".cm-md-inline-math": { cursor: "text", padding: "0 0.1em" },
   // Idle block render (caret outside a `$$` / ```math block). No background at
   // rest so it reads like normal content. `$$` renders are `hoverable` (a subtle
-  // box + "Math" hint appear on hover); ```math renders are plain.
+  // box + "Math" hint appear on hover); ```math renders are plain. NOTE: use
+  // padding, never margin — CM measures element heights excluding margins, so a
+  // margin here desyncs the height map and offsets click/cursor mapping below.
   ".cm-md-math-block": {
     position: "relative",
-    margin: "0.3em 0",
-    padding: "0.5em 0.8em",
+    padding: "0.55em 0.8em",
     overflowX: "auto",
     cursor: "text",
     borderRadius: "6px",
@@ -286,9 +287,11 @@ const livePreviewTheme = EditorView.theme({
   ".cm-md-math-hoverable:hover .cm-md-math-hint": { opacity: "0.85" },
   // Live preview rendered *below* the editing box (a block widget from the
   // mathField StateField, so it never shares the last line's caret position).
+  // Live preview rendered *below* the editing box. Padding only (no margin) so
+  // it doesn't desync the height map; flush against the box so clicks can't fall
+  // into the gap.
   ".cm-md-math-preview": {
-    margin: "0 0 0.4em",
-    padding: "0.45em 0",
+    padding: "0.5em 0 0.6em",
     overflowX: "auto",
   },
   ".cm-md-math-preview .cm-widgetBuffer": { display: "none" },

@@ -113,9 +113,6 @@ export class BlockMathWidget extends WidgetType {
   ignoreEvent() {
     return true;
   }
-  get estimatedHeight() {
-    return 40;
-  }
 }
 
 /**
