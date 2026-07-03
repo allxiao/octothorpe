@@ -4,20 +4,30 @@ import { syntaxTree } from "@codemirror/language";
 import { isElementActive } from "./reveal";
 import { BlockMathWidget } from "./mathWidgets";
 
+interface MathDecos {
+  /** All math block decorations (idle renders + editing previews). */
+  all: DecorationSet;
+  /** Only the idle renders — these are atomic so the caret steps over them. The
+   *  editing previews are NOT atomic (they sit below an editable box and must not
+   *  interfere with clicking/typing in it). */
+  atomic: DecorationSet;
+}
+
 /**
  * Idle block-math rendering: a `$$…$$` or ```` ```math ```` block whose caret is
  * *outside* it is replaced by its rendered display math. Block/line-crossing
  * replace decorations must come from a StateField (a ViewPlugin can't provide
  * them) — the same constraint that puts table rendering in a StateField. When
- * the caret is inside a block this field emits nothing; the live-preview plugin
- * then shows the editable code box plus a live preview below it.
+ * the caret is inside a block this field emits a live preview below the (plugin-
+ * rendered) editable box.
  */
-function build(state: EditorState): DecorationSet {
+function build(state: EditorState): MathDecos {
   const doc = state.doc;
   const slice = (from: number, to: number) => doc.sliceString(from, to);
-  const ranges: Range<Decoration>[] = [];
+  const renders: Range<Decoration>[] = [];
+  const previews: Range<Decoration>[] = [];
 
-  // Idle: replace the whole block with its rendered display math.
+  // Idle: replace the whole block with its rendered display math (atomic).
   const pushRender = (
     from: number,
     to: number,
@@ -26,19 +36,25 @@ function build(state: EditorState): DecorationSet {
     insertLine: boolean,
     hoverable: boolean,
   ) => {
-    ranges.push(
+    renders.push(
       Decoration.replace({
         widget: new BlockMathWidget(latex, enterPos, insertLine, hoverable),
         block: true,
       }).range(from, to),
     );
   };
-  // Editing: a live preview rendered *below* the block. A block widget (not an
-  // inline one anchored to a content line) keeps it off the last line's caret
-  // position — typing at end-of-line no longer lands in the preview.
-  const pushPreview = (pos: number, latex: string) => {
-    ranges.push(
-      Decoration.widget({ widget: new BlockMathWidget(latex), block: true, side: 1 }).range(pos),
+  // Editing: a live preview rendered *below* the block. A non-atomic block widget
+  // (not an inline one anchored to a content line) keeps it off the last line's
+  // caret position and out of the way of clicks/typing in the box above it.
+  // `caretTarget` is where a click on the preview drops the caret (the body's
+  // end) so it never resolves to the invisible collapsed closing fence.
+  const pushPreview = (pos: number, latex: string, caretTarget: number) => {
+    previews.push(
+      Decoration.widget({
+        widget: new BlockMathWidget(latex, -1, false, false, caretTarget),
+        block: true,
+        side: 1,
+      }).range(pos),
     );
   };
 
@@ -55,7 +71,7 @@ function build(state: EditorState): DecorationSet {
         const last = endLine.number - 1;
         const latex = first <= last ? slice(doc.line(first).from, doc.line(last).to) : "";
         if (isElementActive(state, node.from, node.to)) {
-          if (latex.trim()) pushPreview(endLine.to, latex); // editing → preview below
+          if (latex.trim()) pushPreview(endLine.to, latex, doc.line(last).to); // editing → preview below
           return false;
         }
         // Non-empty: click drops the caret into the first body line. Empty
@@ -82,7 +98,7 @@ function build(state: EditorState): DecorationSet {
         if (isElementActive(state, node.from, node.to)) {
           // Editing: the code box is rendered by the live-preview plugin; add
           // only the preview below it.
-          if (latex.trim()) pushPreview(closeLine.to, latex);
+          if (latex.trim()) pushPreview(closeLine.to, latex, doc.line(last).to);
           return false;
         }
         const enterPos = first <= last ? doc.line(first).from : openLine.to;
@@ -94,30 +110,34 @@ function build(state: EditorState): DecorationSet {
     },
   });
 
-  return Decoration.set(ranges, true);
+  return {
+    all: Decoration.set([...renders, ...previews], true),
+    atomic: Decoration.set(renders, true),
+  };
 }
 
-export const mathField = StateField.define<DecorationSet>({
+export const mathField = StateField.define<MathDecos>({
   create: (state) => build(state),
   // Rebuild on edits and on caret moves (the caret entering/leaving a block
   // toggles between the rendered form and the editable box).
-  update(deco, tr) {
-    return tr.docChanged || tr.selection ? build(tr.state) : deco;
+  update(value, tr) {
+    return tr.docChanged || tr.selection ? build(tr.state) : value;
   },
   provide: (f) => [
-    EditorView.decorations.from(f),
-    // A rendered block is atomic so the caret steps over it (click to edit).
-    EditorView.atomicRanges.of((view) => view.state.field(f)),
+    EditorView.decorations.from(f, (v) => v.all),
+    // Only the idle renders are atomic (the caret steps over them); previews are
+    // not, so they never interfere with editing the box above them.
+    EditorView.atomicRanges.of((view) => view.state.field(f).atomic),
   ],
 });
 
 /** Document ranges currently covered by an idle math render (for the inline
  *  pass / tag scan to skip). */
 export function mathBlockRanges(state: EditorState): { from: number; to: number }[] {
-  const set = state.field(mathField, false);
-  if (!set) return [];
+  const value = state.field(mathField, false);
+  if (!value) return [];
   const out: { from: number; to: number }[] = [];
-  const it = set.iter();
+  const it = value.atomic.iter();
   while (it.value) {
     out.push({ from: it.from, to: it.to });
     it.next();

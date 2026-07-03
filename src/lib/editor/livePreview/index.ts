@@ -287,7 +287,7 @@ const livePreviewTheme = EditorView.theme({
   // Live preview rendered *below* the editing box (a block widget from the
   // mathField StateField, so it never shares the last line's caret position).
   ".cm-md-math-preview": {
-    margin: "0.2em 0 0.4em",
+    margin: "0 0 0.4em",
     padding: "0.45em 0",
     overflowX: "auto",
   },

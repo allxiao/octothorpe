@@ -49,6 +49,7 @@ export class BlockMathWidget extends WidgetType {
     readonly enterPos = -1,
     readonly insertLine = false,
     readonly hoverable = false,
+    readonly previewCaret = -1,
   ) {
     super();
   }
@@ -57,7 +58,8 @@ export class BlockMathWidget extends WidgetType {
       other.latex === this.latex &&
       other.enterPos === this.enterPos &&
       other.insertLine === this.insertLine &&
-      other.hoverable === this.hoverable
+      other.hoverable === this.hoverable &&
+      other.previewCaret === this.previewCaret
     );
   }
   toDOM(view: EditorView) {
@@ -94,6 +96,15 @@ export class BlockMathWidget extends WidgetType {
         } else {
           view.dispatch({ selection: { anchor: this.enterPos } });
         }
+        view.focus();
+      });
+    } else if (this.previewCaret >= 0) {
+      // Clicking the preview keeps the caret in the editable body above it — a
+      // native click here would otherwise resolve to the collapsed closing fence
+      // (an invisible caret position where typing breaks the block).
+      div.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        view.dispatch({ selection: { anchor: this.previewCaret } });
         view.focus();
       });
     }
