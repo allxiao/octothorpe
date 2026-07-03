@@ -69,9 +69,17 @@
             />
             <span>{opt.label}</span>
           </label>
-          {#if opt.field && preferences.get<string>(entry.key) === opt.value}
+          {#if opt.field}
             {@const fe = entryByKey.get(opt.field)}
-            {#if fe}{@render controlBody(fe)}{/if}
+            {#if fe}
+              <!-- Always rendered (space reserved) so toggling doesn't reflow. -->
+              <span
+                class="inline-field"
+                class:hidden={preferences.get<string>(entry.key) !== opt.value}
+              >
+                {@render controlBody(fe)}
+              </span>
+            {/if}
           {/if}
         </div>
       {/each}
@@ -306,9 +314,11 @@
   }
   .radios {
     display: flex;
-    flex-direction: column;
-    gap: 6px;
-    align-items: flex-end;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 18px;
+    flex-wrap: nowrap;
   }
   .radio {
     display: flex;
@@ -321,9 +331,19 @@
     gap: 6px;
     font-size: 13px;
     cursor: pointer;
+    white-space: nowrap;
   }
   .radio input[type="radio"] {
     cursor: pointer;
+  }
+  .inline-field {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  /* Keep the slot's box so switching Auto/Customized doesn't reflow the row. */
+  .inline-field.hidden {
+    visibility: hidden;
   }
   .unit {
     font-size: 12px;
