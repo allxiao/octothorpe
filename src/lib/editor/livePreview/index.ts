@@ -8,7 +8,7 @@ import {
 import type { Extension } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
 import { buildDecorations } from "./build";
-import { onTagClick, revealSimpleSource } from "./config";
+import { onTagClick, revealSimpleSource, inlineMathRender } from "./config";
 import { tableField } from "./tableField";
 import { linkRefsField } from "./linkRefs";
 import { clearActiveTable } from "./TableWidget";
@@ -116,7 +116,8 @@ class LivePreviewPlugin {
       update.docChanged ||
       update.viewportChanged ||
       update.selectionSet ||
-      update.startState.facet(revealSimpleSource) !== update.state.facet(revealSimpleSource)
+      update.startState.facet(revealSimpleSource) !== update.state.facet(revealSimpleSource) ||
+      update.startState.facet(inlineMathRender) !== update.state.facet(inlineMathRender)
     ) {
       const built = buildDecorations(update.view);
       this.decorations = built.decorations;
@@ -244,6 +245,28 @@ const livePreviewTheme = EditorView.theme({
     color: "#fff",
   },
   ".cm-md-strike": { textDecoration: "line-through", opacity: "0.7" },
+  // Inline math rendered in place of `$…$`.
+  ".cm-md-inline-math": { cursor: "text", padding: "0 0.1em" },
+  // Full block render shown when the caret is outside a `$$` / ```math block.
+  ".cm-md-math-block": {
+    margin: "0.4em 0",
+    padding: "0.5em 0.8em",
+    overflowX: "auto",
+    cursor: "text",
+    borderRadius: "6px",
+    background: "var(--code-block-bg, rgba(135, 131, 120, 0.1))",
+  },
+  // Live preview shown below the editable box while the caret is inside a block.
+  // It hangs off the bottom of the code box (which has square bottom corners
+  // here because the preview continues it).
+  ".cm-md-math-preview": {
+    padding: "0.5em 0.8em",
+    overflowX: "auto",
+    borderRadius: "0 0 6px 6px",
+    borderTop: "1px dashed var(--border, #ccc)",
+    background: "var(--code-block-bg, rgba(135, 131, 120, 0.1))",
+  },
+  ".cm-md-math-error": { color: "#e00", fontFamily: "var(--editor-font, monospace)" },
   ".cm-md-link": { color: "#3b82f6", textDecoration: "underline", cursor: "pointer" },
   // A reference link with no matching definition: dashed underline + a small
   // amber "?" marker at its right end.

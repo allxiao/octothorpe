@@ -25,3 +25,12 @@ export const onTagClick = Facet.define<
 export const revealSimpleSource = Facet.define<boolean, boolean>({
   combine: (values) => (values.length ? values[values.length - 1] : true),
 });
+
+/**
+ * Whether inline `$…$` math renders (as KaTeX) or stays as literal source.
+ * Driven by the `markdown.inlineMath` preference; defaults to true. Block math
+ * (`$$…$$`, ```` ```math ````) always renders and is not gated by this.
+ */
+export const inlineMathRender = Facet.define<boolean, boolean>({
+  combine: (values) => (values.length ? values[values.length - 1] : true),
+});

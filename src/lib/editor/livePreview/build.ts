@@ -3,7 +3,7 @@ import { syntaxTree } from "@codemirror/language";
 import { type Range } from "@codemirror/state";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { isElementActive, isLineActive } from "./reveal";
-import { imageBaseDir, revealSimpleSource } from "./config";
+import { imageBaseDir, revealSimpleSource, inlineMathRender } from "./config";
 import { scanTagsInLine } from "./tagScan";
 import {
   ImageWidget,
@@ -13,6 +13,7 @@ import {
   CodeLangWidget,
   PlaceholderWidget,
 } from "./widgets";
+import { InlineMathWidget, BlockMathWidget } from "./mathWidgets";
 import { tableRanges } from "./tableField";
 import { resolveLinkRef } from "./linkRefs";
 
@@ -95,6 +96,32 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
   // When false, simple-block markers (#, >, bullets) never reveal their source —
   // they stay rendered even on the focused line (editor.revealSourceOnFocus).
   const revealSource = state.facet(revealSimpleSource);
+  // Whether inline `$…$` renders (markdown.inlineMath). Block math always renders.
+  const inlineMathOn = state.facet(inlineMathRender);
+
+  // Replace a whole math block with its rendered form (caret outside the block).
+  // Clicking the render drops the caret at `enterPos` so the source box appears.
+  const emitMathIdle = (from: number, to: number, latex: string, enterPos: number) => {
+    const d = Decoration.replace({
+      widget: new BlockMathWidget(latex, enterPos),
+      block: true,
+    }).range(from, to);
+    decos.push(d);
+    atomic.push(d);
+  };
+  // Live preview shown below the editable box while the caret is inside a block.
+  const emitMathPreview = (lineFrom: number, latex: string) => {
+    decos.push(
+      Decoration.widget({
+        widget: new BlockMathWidget(latex),
+        side: 1,
+        block: true,
+      }).range(lineFrom),
+    );
+  };
+  // Body LaTeX of a block spanning content lines [firstLn, lastLn] (inclusive).
+  const blockLatex = (firstLn: number, lastLn: number) =>
+    firstLn <= lastLn ? slice(state.doc.line(firstLn).from, state.doc.line(lastLn).to) : "";
 
   // Tables are rendered as editable block widgets (via a StateField); skip any
   // inline decoration inside them.
@@ -177,6 +204,24 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
 
           codeRanges.push({ from: node.from, to: node.to });
 
+          // ```` ```math ```` renders like a `$$` block: idle → the rendered
+          // math; while the caret is inside → the code box (below) plus a live
+          // preview under it.
+          const langInfo = info ? slice(info.from, info.to).trim() : "";
+          const isMathFence = langInfo === "math";
+          const mathFenceActive = isMathFence && isElementActive(state, node.from, node.to);
+          if (isMathFence && !mathFenceActive) {
+            const first = openLine.number + 1;
+            const last = closeLine.number - 1;
+            emitMathIdle(
+              openLine.from,
+              closeLine.to,
+              blockLatex(first, last),
+              state.doc.line(first).from,
+            );
+            return false;
+          }
+
           // Structural indent (list/quote nesting) sits before the fence and is
           // excluded from the code nodes. Inset the box by it so the block lines
           // up with its list item's content instead of the far-left margin.
@@ -219,7 +264,65 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
               side: 1,
             }).range(closeLine.from),
           );
+          // Editing a ```math block: show the live render below the code box.
+          if (mathFenceActive) {
+            emitMathPreview(closeLine.from, blockLatex(firstContent, lastContent));
+          }
           // Don't descend: CodeText stays real text (natively highlighted).
+          return false;
+        }
+
+        // --- Inline math `$…$`: render in place; reveal the raw source while the
+        //     caret is inside it (like bold/italic). Off → stays literal text. ---
+        if (name === "InlineMath") {
+          if (inlineMathOn && !isElementActive(state, node.from, node.to)) {
+            const latex = slice(node.from + 1, node.to - 1);
+            const d = Decoration.replace({
+              widget: new InlineMathWidget(latex, node.from),
+            }).range(node.from, node.to);
+            decos.push(d);
+            atomic.push(d);
+          }
+          return false; // never descend into the `$` marks
+        }
+
+        // --- Block math `$$ … $$`: idle → the rendered display math; caret
+        //     inside → a code-style box plus a live preview below it. ---
+        if (name === "BlockMath") {
+          const n = node.node;
+          const marks = n.getChildren("BlockMathMark");
+          // Only one delimiter so far → still being typed; leave it as raw text.
+          if (marks.length < 2) return false;
+          codeRanges.push({ from: node.from, to: node.to });
+
+          const startLine = state.doc.lineAt(node.from);
+          const endLine = state.doc.lineAt(node.to);
+          const first = startLine.number + 1;
+          const last = endLine.number - 1;
+          const latex = blockLatex(first, last);
+
+          if (!isElementActive(state, node.from, node.to)) {
+            const enterPos =
+              first <= state.doc.lines ? state.doc.line(first).from : node.from;
+            emitMathIdle(startLine.from, endLine.to, latex, enterPos);
+            return false;
+          }
+
+          // Editing: collapse the `$$` fence lines, box the body, preview below.
+          const openMark = marks[0];
+          const closeMark = marks[marks.length - 1];
+          lineClass(startLine.from, "cm-md-code-fence");
+          lineClass(endLine.from, "cm-md-code-fence");
+          hide(openMark.from, openMark.to);
+          hide(closeMark.from, closeMark.to);
+          for (let ln = first; ln <= last; ln++) {
+            const line = state.doc.line(ln);
+            let cls = "cm-md-code-block";
+            if (ln === first) cls += " cm-md-code-top";
+            if (ln === last) cls += " cm-md-code-bottom";
+            decos.push(Decoration.line({ class: cls }).range(line.from));
+          }
+          emitMathPreview(endLine.from, latex);
           return false;
         }
 
