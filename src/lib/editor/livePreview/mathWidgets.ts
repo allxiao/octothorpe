@@ -68,6 +68,13 @@ export class BlockMathWidget extends WidgetType {
       div.textContent = "Empty math block — click to edit";
     } else {
       div.innerHTML = renderMath(this.latex, true);
+      // Idle render: a small "Math" hint on hover signals it's editable math.
+      if (rendered) {
+        const hint = document.createElement("span");
+        hint.className = "cm-md-math-hint";
+        hint.textContent = "Math";
+        div.appendChild(hint);
+      }
     }
     if (rendered) {
       div.addEventListener("mousedown", (e) => {
@@ -92,5 +99,25 @@ export class BlockMathWidget extends WidgetType {
   }
   get estimatedHeight() {
     return 40;
+  }
+}
+
+/**
+ * A small static "Math" badge shown at the top-right of a `$$…$$` block while it
+ * is being edited (the `$$` fences stay visible, so this labels the block the way
+ * the language picker labels a fenced code block).
+ */
+export class MathBadgeWidget extends WidgetType {
+  eq() {
+    return true;
+  }
+  toDOM() {
+    const span = document.createElement("span");
+    span.className = "cm-md-math-badge";
+    span.textContent = "Math";
+    return span;
+  }
+  ignoreEvent() {
+    return true;
   }
 }

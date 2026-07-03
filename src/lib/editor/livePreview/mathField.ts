@@ -17,12 +17,21 @@ function build(state: EditorState): DecorationSet {
   const slice = (from: number, to: number) => doc.sliceString(from, to);
   const ranges: Range<Decoration>[] = [];
 
-  const push = (from: number, to: number, latex: string, enterPos: number, insertLine: boolean) => {
+  // Idle: replace the whole block with its rendered display math.
+  const pushRender = (from: number, to: number, latex: string, enterPos: number, insertLine: boolean) => {
     ranges.push(
       Decoration.replace({
         widget: new BlockMathWidget(latex, enterPos, insertLine),
         block: true,
       }).range(from, to),
+    );
+  };
+  // Editing: a live preview rendered *below* the block. A block widget (not an
+  // inline one anchored to a content line) keeps it off the last line's caret
+  // position — typing at end-of-line no longer lands in the preview.
+  const pushPreview = (pos: number, latex: string) => {
+    ranges.push(
+      Decoration.widget({ widget: new BlockMathWidget(latex), block: true, side: 1 }).range(pos),
     );
   };
 
@@ -33,17 +42,19 @@ function build(state: EditorState): DecorationSet {
       if (name === "BlockMath") {
         const marks = node.node.getChildren("BlockMathMark");
         if (marks.length < 2) return false; // still being typed
-        if (isElementActive(state, node.from, node.to)) return false; // editing
         const startLine = doc.lineAt(node.from);
         const endLine = doc.lineAt(node.to);
         const first = startLine.number + 1;
         const last = endLine.number - 1;
-        const empty = first > last;
-        const latex = empty ? "" : slice(doc.line(first).from, doc.line(last).to);
+        const latex = first <= last ? slice(doc.line(first).from, doc.line(last).to) : "";
+        if (isElementActive(state, node.from, node.to)) {
+          if (latex.trim()) pushPreview(endLine.to, latex); // editing → preview below
+          return false;
+        }
         // Non-empty: click drops the caret into the first body line. Empty
         // (`$$\n$$`): click inserts a blank line after the opener to type into.
-        const enterPos = empty ? startLine.to : doc.line(first).from;
-        push(startLine.from, endLine.to, latex, enterPos, empty);
+        const enterPos = first <= last ? doc.line(first).from : startLine.to;
+        pushRender(startLine.from, endLine.to, latex, enterPos, first > last);
         return false;
       }
 
@@ -53,15 +64,17 @@ function build(state: EditorState): DecorationSet {
         if (marks.length < 2) return false;
         const info = n.getChild("CodeInfo");
         if (!info || slice(info.from, info.to).trim() !== "math") return false;
-        if (isElementActive(state, node.from, node.to)) return false;
         const openLine = doc.lineAt(node.from);
         const closeLine = doc.lineAt(marks[marks.length - 1].from);
         const first = openLine.number + 1;
         const last = closeLine.number - 1;
-        const empty = first > last;
-        const latex = empty ? "" : slice(doc.line(first).from, doc.line(last).to);
-        const enterPos = empty ? openLine.to : doc.line(first).from;
-        push(openLine.from, closeLine.to, latex, enterPos, empty);
+        const latex = first <= last ? slice(doc.line(first).from, doc.line(last).to) : "";
+        if (isElementActive(state, node.from, node.to)) {
+          if (latex.trim()) pushPreview(closeLine.to, latex);
+          return false;
+        }
+        const enterPos = first <= last ? doc.line(first).from : openLine.to;
+        pushRender(openLine.from, closeLine.to, latex, enterPos, first > last);
         return false;
       }
 

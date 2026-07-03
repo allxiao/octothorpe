@@ -13,7 +13,7 @@ import {
   CodeLangWidget,
   PlaceholderWidget,
 } from "./widgets";
-import { InlineMathWidget, BlockMathWidget } from "./mathWidgets";
+import { InlineMathWidget, BlockMathWidget, MathBadgeWidget } from "./mathWidgets";
 import { tableRanges } from "./tableField";
 import { resolveLinkRef } from "./linkRefs";
 
@@ -99,26 +99,6 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
   // Whether inline `$…$` renders (markdown.inlineMath). Block math always renders.
   const inlineMathOn = state.facet(inlineMathRender);
 
-  // Live preview shown below the editable box while the caret is inside a block.
-  // An inline widget with `display:block` CSS (not a block decoration, which a
-  // plugin can't provide) — the same trick the image "preview" variant uses. The
-  // idle full-block render lives in the mathField StateField instead.
-  const emitMathPreview = (pos: number, latex: string) => {
-    decos.push(
-      Decoration.widget({
-        widget: new BlockMathWidget(latex),
-        side: 1,
-      }).range(pos),
-    );
-  };
-  // Body LaTeX of a block spanning content lines [firstLn, lastLn] (inclusive).
-  const blockLatex = (firstLn: number, lastLn: number) =>
-    firstLn <= lastLn ? slice(state.doc.line(firstLn).from, state.doc.line(lastLn).to) : "";
-  // End of the last content line of a block (where the preview is anchored), or
-  // the given fallback when the block has no body.
-  const blockPreviewPos = (firstLn: number, lastLn: number, fallback: number) =>
-    firstLn <= lastLn ? state.doc.line(lastLn).to : fallback;
-
   // Tables are rendered as editable block widgets (via a StateField); skip any
   // inline decoration inside them.
   const tables = tableRanges(state);
@@ -203,7 +183,7 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
           // ```` ```math ```` renders like a `$$` block: idle → the rendered
           // math (handled by the mathField StateField, which can emit the
           // block-replace a plugin can't); while the caret is inside → the code
-          // box (below) plus a live preview under it.
+          // box, with a live preview rendered below by mathField.
           const langInfo = info ? slice(info.from, info.to).trim() : "";
           const isMathFence = langInfo === "math";
           const mathFenceActive = isMathFence && isElementActive(state, node.from, node.to);
@@ -253,13 +233,7 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
               side: 1,
             }).range(closeLine.from),
           );
-          // Editing a ```math block: show the live render below the code box.
-          if (mathFenceActive) {
-            const previewLatex = blockLatex(firstContent, lastContent);
-            if (previewLatex.trim()) {
-              emitMathPreview(blockPreviewPos(firstContent, lastContent, closeLine.from), previewLatex);
-            }
-          }
+          // (A ```math block's live preview is rendered below by mathField.)
           // Don't descend: CodeText stays real text (natively highlighted).
           return false;
         }
@@ -279,7 +253,8 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
         }
 
         // --- Block math `$$ … $$`: idle → the rendered display math; caret
-        //     inside → a code-style box plus a live preview below it. ---
+        //     inside → an editable box that keeps the `$$` fences visible, with
+        //     a live preview rendered below it by the mathField StateField. ---
         if (name === "BlockMath") {
           const n = node.node;
           const marks = n.getChildren("BlockMathMark");
@@ -291,7 +266,6 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
           const endLine = state.doc.lineAt(node.to);
           const first = startLine.number + 1;
           const last = endLine.number - 1;
-          const latex = blockLatex(first, last);
 
           if (!isElementActive(state, node.from, node.to)) {
             return false; // idle: rendered by mathField (codeRange already recorded)
@@ -302,21 +276,22 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
           // it via the idle render inserts a blank body line first.
           if (first > last) return false;
 
-          // Editing: collapse the `$$` fence lines, box the body, preview below.
+          // Editing: unlike a code block, the `$$` fences stay visible (just
+          // dimmed). Box the whole block; a "Math" badge marks the top-right.
           const openMark = marks[0];
           const closeMark = marks[marks.length - 1];
-          lineClass(startLine.from, "cm-md-code-fence");
-          lineClass(endLine.from, "cm-md-code-fence");
-          hide(openMark.from, openMark.to);
-          hide(closeMark.from, closeMark.to);
-          for (let ln = first; ln <= last; ln++) {
+          for (let ln = startLine.number; ln <= endLine.number; ln++) {
             const line = state.doc.line(ln);
             let cls = "cm-md-code-block";
-            if (ln === first) cls += " cm-md-code-top";
-            if (ln === last) cls += " cm-md-code-bottom";
+            if (ln === startLine.number) cls += " cm-md-code-top cm-md-math-edit-top";
+            if (ln === endLine.number) cls += " cm-md-code-bottom";
             decos.push(Decoration.line({ class: cls }).range(line.from));
           }
-          if (latex.trim()) emitMathPreview(blockPreviewPos(first, last, endLine.from), latex);
+          mark(openMark.from, openMark.to, "cm-md-math-fence");
+          mark(closeMark.from, closeMark.to, "cm-md-math-fence");
+          decos.push(
+            Decoration.widget({ widget: new MathBadgeWidget(), side: 1 }).range(startLine.from),
+          );
           return false;
         }
 

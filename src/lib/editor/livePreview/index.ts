@@ -248,28 +248,60 @@ const livePreviewTheme = EditorView.theme({
   ".cm-md-strike": { textDecoration: "line-through", opacity: "0.7" },
   // Inline math rendered in place of `$…$`.
   ".cm-md-inline-math": { cursor: "text", padding: "0 0.1em" },
-  // Full block render shown when the caret is outside a `$$` / ```math block.
+  // Idle block render (caret outside a `$$` / ```math block). No special
+  // background — it reads like normal document content, just centered math.
   ".cm-md-math-block": {
+    position: "relative",
     margin: "0.4em 0",
-    padding: "0.5em 0.8em",
+    padding: "0.2em 0",
     overflowX: "auto",
     cursor: "text",
-    borderRadius: "6px",
-    background: "var(--code-block-bg, rgba(135, 131, 120, 0.1))",
   },
-  // Live preview shown below the editable box while the caret is inside a block.
-  // Rendered as an inline widget with display:block (like the image preview), so
-  // it sits on its own line under the source box.
+  // Small "Math" hint shown at the top-right of an idle render on hover.
+  ".cm-md-math-hint": {
+    position: "absolute",
+    top: "2px",
+    right: "4px",
+    padding: "0 6px",
+    fontSize: "11px",
+    lineHeight: "16px",
+    fontFamily: "system-ui, sans-serif",
+    color: "var(--text, #555)",
+    background: "var(--menu-bg, #fff)",
+    border: "1px solid var(--border, #ccc)",
+    borderRadius: "5px",
+    opacity: "0",
+    transition: "opacity 0.1s",
+    pointerEvents: "none",
+  },
+  ".cm-md-math-block:hover .cm-md-math-hint": { opacity: "0.85" },
+  // Live preview rendered *below* the editing box (a block widget from the
+  // mathField StateField, so it never shares the last line's caret position).
   ".cm-md-math-preview": {
-    display: "block",
-    margin: "0.35em 0",
-    padding: "0.5em 0.8em",
+    margin: "0.2em 0 0.5em",
+    padding: "0.3em 0",
     overflowX: "auto",
-    borderRadius: "6px",
-    border: "1px dashed var(--border, #ccc)",
-    background: "var(--code-block-bg, rgba(135, 131, 120, 0.1))",
   },
   ".cm-md-math-preview .cm-widgetBuffer": { display: "none" },
+  // `$$` editing: the fences stay visible (dimmed); the first boxed line hosts
+  // the top-right "Math" badge.
+  ".cm-md-math-edit-top": { position: "relative" },
+  ".cm-md-math-fence": { opacity: "0.45" },
+  ".cm-md-math-badge": {
+    position: "absolute",
+    top: "3px",
+    right: "6px",
+    padding: "0 6px",
+    fontSize: "11px",
+    lineHeight: "16px",
+    fontFamily: "system-ui, sans-serif",
+    color: "var(--text, #555)",
+    background: "var(--menu-bg, #fff)",
+    border: "1px solid var(--border, #ccc)",
+    borderRadius: "5px",
+    opacity: "0.6",
+    pointerEvents: "none",
+  },
   // Placeholder for an empty block (`$$\n$$`) — clickable to open a body line.
   ".cm-md-math-empty": {
     textAlign: "center",
