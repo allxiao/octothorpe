@@ -3,6 +3,7 @@
 
 import type { EditorView } from "@codemirror/view";
 import type { ChangeSpec, EditorState, Line } from "@codemirror/state";
+import { preferences } from "../../preferences/store.svelte";
 
 /** The lines spanned by the primary selection (inclusive). */
 export function selectedLines(state: EditorState): Line[] {
@@ -17,6 +18,22 @@ export function selectedLines(state: EditorState): Line[] {
 /** Leading whitespace of a line. */
 export function indentOf(text: string): string {
   return /^\s*/.exec(text)?.[0] ?? "";
+}
+
+/** Configured spaces-per-indent (editor.indentSize), clamped to 2–8. */
+export function indentWidth(): number {
+  const n = Number(preferences.get<string>("editor.indentSize"));
+  return Number.isFinite(n) ? Math.max(2, Math.min(8, Math.round(n))) : 4;
+}
+
+/**
+ * Spacing to insert after a list/quote marker of `markerLen` characters. With
+ * "pretty indentation" on, pad so the marker + gap fills the configured indent
+ * width (e.g. size 4 → `-   `); otherwise a single space.
+ */
+export function markerGap(markerLen: number): string {
+  if (!preferences.get<boolean>("editor.prettyIndent")) return " ";
+  return " ".repeat(Math.max(1, indentWidth() - markerLen));
 }
 
 /**

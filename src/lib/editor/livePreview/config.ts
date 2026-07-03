@@ -15,3 +15,13 @@ export const onTagClick = Facet.define<
 >({
   combine: (values) => (values.length ? values[values.length - 1] : null),
 });
+
+/**
+ * Whether "simple block" markers (heading `#`, quote `>`, list bullets) reveal
+ * their Markdown source on the focused line. When false they stay rendered even
+ * while the cursor is on them. Driven by the `editor.revealSourceOnFocus`
+ * preference; defaults to true (reveal on focus).
+ */
+export const revealSimpleSource = Facet.define<boolean, boolean>({
+  combine: (values) => (values.length ? values[values.length - 1] : true),
+});

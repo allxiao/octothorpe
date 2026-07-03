@@ -2,14 +2,14 @@
 // TOC/front-matter/link-reference/footnote/paragraph blocks.
 
 import type { EditorView } from "@codemirror/view";
-import { insertText, mapLines, selectedLines } from "./util";
+import { insertText, mapLines, markerGap, selectedLines } from "./util";
 import { detectFence, FENCE_RE } from "./code";
 
 const QUOTE_RE = /^(\s*)>\s?/;
 
 export function quote(view: EditorView): boolean {
   const allOn = selectedLines(view.state).every((l) => QUOTE_RE.test(l.text));
-  return mapLines(view, (text) => (allOn ? text.replace(QUOTE_RE, "$1") : "> " + text));
+  return mapLines(view, (text) => (allOn ? text.replace(QUOTE_RE, "$1") : ">" + markerGap(1) + text));
 }
 
 export function mathBlock(view: EditorView): boolean {

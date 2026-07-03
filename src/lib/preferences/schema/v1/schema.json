@@ -45,6 +45,108 @@
           "title": "Word Wrap",
           "description": "Wrap long lines to the editor width instead of scrolling horizontally.",
           "x-ui": { "category": "editor", "section": "Behavior", "control": "toggle", "order": 1 }
+        },
+        "indentSize": {
+          "type": "string",
+          "default": "4",
+          "enum": ["2", "3", "4", "5"],
+          "title": "Indent Size",
+          "description": "Number of spaces per indent level (indentation always uses spaces).",
+          "x-ui": {
+            "category": "editor",
+            "section": "Indentation",
+            "control": "select",
+            "order": 1,
+            "options": [
+              { "value": "2", "label": "2" },
+              { "value": "3", "label": "3" },
+              { "value": "4", "label": "4" },
+              { "value": "5", "label": "5" }
+            ]
+          }
+        },
+        "prettyIndent": {
+          "type": "boolean",
+          "default": false,
+          "title": "Pretty indentation",
+          "description": "Pad list and quote markers to the indent width (e.g. \"-   item\") so nested content lines up.",
+          "x-ui": { "category": "editor", "section": "Indentation", "control": "toggle", "order": 2 }
+        },
+        "autoPairBrackets": {
+          "type": "boolean",
+          "default": true,
+          "title": "Auto pair brackets and quotes",
+          "description": "Automatically insert the closing bracket or quote when you type an opening one.",
+          "x-ui": { "category": "editor", "section": "Auto Pair", "control": "toggle", "order": 1 }
+        },
+        "autoPairMarkdown": {
+          "type": "boolean",
+          "default": false,
+          "title": "Auto pair common Markdown syntax",
+          "description": "Also auto-pair Markdown emphasis markers (* _ ~ `).",
+          "x-ui": { "category": "editor", "section": "Auto Pair", "control": "toggle", "order": 2 }
+        },
+        "emojiAutocomplete": {
+          "type": "boolean",
+          "default": true,
+          "title": "Enable autocomplete for Emojis",
+          "description": "Suggest emojis while typing a `:name:` shortcode.",
+          "x-ui": { "category": "editor", "section": "Auto Complete", "control": "toggle", "order": 1 }
+        },
+        "revealSourceOnFocus": {
+          "type": "boolean",
+          "default": true,
+          "title": "Display source for simple blocks on focus",
+          "description": "Reveal the Markdown source (heading #, quote >, list markers) on the line the cursor is on. When off, those blocks stay rendered even while focused.",
+          "x-ui": { "category": "editor", "section": "Live Rendering", "control": "toggle", "order": 1 }
+        },
+        "copyMarkdownAsPlain": {
+          "type": "boolean",
+          "default": false,
+          "title": "Copy Markdown source as plain text",
+          "description": "Ctrl+C copies the text with Markdown syntax stripped, instead of the raw source.",
+          "x-ui": { "category": "editor", "section": "Copy Behavior", "control": "toggle", "order": 1 }
+        },
+        "copyWholeLine": {
+          "type": "boolean",
+          "default": true,
+          "title": "Copy or cut the whole line when nothing is selected",
+          "description": "With no selection, Ctrl+C / Ctrl+X act on the current line.",
+          "x-ui": { "category": "editor", "section": "Copy Behavior", "control": "toggle", "order": 2 }
+        },
+        "lineEnding": {
+          "type": "string",
+          "default": "lf",
+          "enum": ["lf", "crlf"],
+          "title": "Default Line Ending",
+          "description": "Line ending used when saving files and creating new documents.",
+          "x-ui": {
+            "category": "editor",
+            "section": "Line Ending",
+            "control": "select",
+            "order": 1,
+            "options": [
+              { "value": "lf", "label": "LF (Unix Style)" },
+              { "value": "crlf", "label": "CRLF (Windows Style)" }
+            ]
+          }
+        },
+        "spellCheck": {
+          "type": "string",
+          "default": "auto",
+          "enum": ["auto", "off"],
+          "title": "Spell Check",
+          "description": "Enable the system spell-checker in the editor (the language is chosen by the OS).",
+          "x-ui": {
+            "category": "editor",
+            "section": "Spell Check",
+            "control": "select",
+            "order": 1,
+            "options": [
+              { "value": "auto", "label": "Auto Detect Language" },
+              { "value": "off", "label": "Off" }
+            ]
+          }
         }
       }
     },

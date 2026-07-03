@@ -1,13 +1,15 @@
 <script lang="ts">
   import { onMount, onDestroy, untrack } from "svelte";
-  import { EditorView } from "@codemirror/view";
+  import { EditorView, keymap } from "@codemirror/view";
   import { EditorState, Compartment, Annotation } from "@codemirror/state";
   import { undo, redo, undoDepth, redoDepth } from "@codemirror/commands";
-  import { syntaxTree } from "@codemirror/language";
+  import { syntaxTree, indentUnit } from "@codemirror/language";
+  import { closeBrackets, closeBracketsKeymap, autocompletion } from "@codemirror/autocomplete";
   import { baseExtensions } from "./setup";
   import { livePreview } from "./livePreview";
-  import { imageBaseDir, onTagClick } from "./livePreview/config";
+  import { imageBaseDir, onTagClick, revealSimpleSource } from "./livePreview/config";
   import { resolveImageFsPath } from "./livePreview/build";
+  import { emojiCompletions } from "./emoji";
   import {
     COMMANDS,
     blockState as computeBlockState,
@@ -47,6 +49,16 @@
   const typographyComp = new Compartment();
   // Word-wrap toggle driven by preferences.
   const wrapComp = new Compartment();
+  // Indent unit / tab size (editor.indentSize).
+  const indentComp = new Compartment();
+  // Auto-pairing of brackets / Markdown syntax (editor.autoPair*).
+  const autoPairComp = new Compartment();
+  // Autocomplete sources, e.g. emoji (editor.emojiAutocomplete).
+  const autocompleteComp = new Compartment();
+  // "Reveal source on focus" facet for simple blocks (editor.revealSourceOnFocus).
+  const revealComp = new Compartment();
+  // Spell-check content attribute (editor.spellCheck).
+  const spellComp = new Compartment();
 
   const editorPrefs = preferences.scope("editor");
 
@@ -58,6 +70,40 @@
         lineHeight: String(editorPrefs.get<number>("lineHeight")),
       },
     });
+  }
+
+  /** Spaces-per-indent from preferences (indentation is always spaces). */
+  function indentSizeNum() {
+    const n = Number(editorPrefs.get<string>("indentSize"));
+    return Number.isFinite(n) ? Math.max(2, Math.min(8, Math.round(n))) : 4;
+  }
+  function indentExt() {
+    const n = indentSizeNum();
+    return [indentUnit.of(" ".repeat(n)), EditorState.tabSize.of(n)];
+  }
+
+  /** Close-brackets extension whose bracket set depends on the auto-pair prefs. */
+  function autoPairExt() {
+    const brackets: string[] = [];
+    if (editorPrefs.get<boolean>("autoPairBrackets")) brackets.push("(", "[", "{", "'", '"');
+    if (editorPrefs.get<boolean>("autoPairMarkdown")) brackets.push("*", "_", "`", "~");
+    if (!brackets.length) return [];
+    return [
+      closeBrackets(),
+      keymap.of(closeBracketsKeymap),
+      EditorState.languageData.of(() => [{ closeBrackets: { brackets } }]),
+    ];
+  }
+
+  function autocompleteExt() {
+    return editorPrefs.get<boolean>("emojiAutocomplete")
+      ? autocompletion({ override: [emojiCompletions] })
+      : [];
+  }
+
+  function spellAttrs() {
+    const on = editorPrefs.get<string>("spellCheck") !== "off";
+    return EditorView.contentAttributes.of({ spellcheck: on ? "true" : "false" });
   }
   // Marks a programmatic document reset (opening a file / new buffer) so it
   // isn't reported as a user edit.
@@ -188,6 +234,11 @@
         livePreviewComp.of(sourceMode ? [] : livePreview()),
         typographyComp.of(typographyTheme()),
         wrapComp.of(editorPrefs.get<boolean>("wordWrap") ? EditorView.lineWrapping : []),
+        indentComp.of(indentExt()),
+        autoPairComp.of(autoPairExt()),
+        autocompleteComp.of(autocompleteExt()),
+        revealComp.of(revealSimpleSource.of(editorPrefs.get<boolean>("revealSourceOnFocus"))),
+        spellComp.of(spellAttrs()),
         baseDirComp.of(imageBaseDir.of(baseDir)),
         onTagClick.of((tag) => ontagclick?.(tag)),
         EditorView.updateListener.of((u) => {
@@ -273,6 +324,37 @@
     if (view) {
       view.dispatch({ effects: wrapComp.reconfigure(wrap ? EditorView.lineWrapping : []) });
     }
+  });
+
+  // Live-refresh indent size (always spaces).
+  $effect(() => {
+    editorPrefs.get<string>("indentSize");
+    if (view) view.dispatch({ effects: indentComp.reconfigure(indentExt()) });
+  });
+
+  // Live-refresh auto-pairing (brackets / Markdown syntax).
+  $effect(() => {
+    editorPrefs.get<boolean>("autoPairBrackets");
+    editorPrefs.get<boolean>("autoPairMarkdown");
+    if (view) view.dispatch({ effects: autoPairComp.reconfigure(autoPairExt()) });
+  });
+
+  // Live-refresh emoji autocomplete.
+  $effect(() => {
+    editorPrefs.get<boolean>("emojiAutocomplete");
+    if (view) view.dispatch({ effects: autocompleteComp.reconfigure(autocompleteExt()) });
+  });
+
+  // Live-refresh "reveal source on focus" for simple blocks.
+  $effect(() => {
+    const reveal = editorPrefs.get<boolean>("revealSourceOnFocus");
+    if (view) view.dispatch({ effects: revealComp.reconfigure(revealSimpleSource.of(reveal)) });
+  });
+
+  // Live-refresh the spell-check content attribute.
+  $effect(() => {
+    editorPrefs.get<string>("spellCheck");
+    if (view) view.dispatch({ effects: spellComp.reconfigure(spellAttrs()) });
   });
 </script>
 

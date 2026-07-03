@@ -8,7 +8,7 @@ import {
 import type { Extension } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
 import { buildDecorations } from "./build";
-import { onTagClick } from "./config";
+import { onTagClick, revealSimpleSource } from "./config";
 import { tableField } from "./tableField";
 import { linkRefsField } from "./linkRefs";
 import { clearActiveTable } from "./TableWidget";
@@ -112,7 +112,12 @@ class LivePreviewPlugin {
   }
 
   update(update: ViewUpdate) {
-    if (update.docChanged || update.viewportChanged || update.selectionSet) {
+    if (
+      update.docChanged ||
+      update.viewportChanged ||
+      update.selectionSet ||
+      update.startState.facet(revealSimpleSource) !== update.state.facet(revealSimpleSource)
+    ) {
       const built = buildDecorations(update.view);
       this.decorations = built.decorations;
       this.atomic = built.atomic;

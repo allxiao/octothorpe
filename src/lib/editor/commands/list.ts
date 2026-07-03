@@ -2,7 +2,7 @@
 // indentation on the selected lines.
 
 import type { EditorView } from "@codemirror/view";
-import { indentOf, mapLines, selectedLines } from "./util";
+import { indentOf, indentWidth, mapLines, markerGap, selectedLines } from "./util";
 
 const BULLET_RE = /^(\s*)[-*+]\s+/;
 const ORDERED_RE = /^(\s*)\d+[.)]\s+/;
@@ -26,7 +26,7 @@ export function listUnordered(view: EditorView): boolean {
     if (allOn) return stripped;
     if (isBlank(stripped)) return text;
     const ind = indentOf(stripped);
-    return ind + "- " + stripped.slice(ind.length);
+    return ind + "-" + markerGap(1) + stripped.slice(ind.length);
   });
 }
 
@@ -39,7 +39,8 @@ export function listOrdered(view: EditorView): boolean {
     if (isBlank(stripped)) return text;
     n += 1;
     const ind = indentOf(stripped);
-    return ind + n + ". " + stripped.slice(ind.length);
+    const marker = n + ".";
+    return ind + marker + markerGap(marker.length) + stripped.slice(ind.length);
   });
 }
 
@@ -71,10 +72,11 @@ export function taskIncomplete(view: EditorView): boolean {
   return mapLines(view, (t) => setTask(t, false));
 }
 
-const UNIT = "  ";
 export function indent(view: EditorView): boolean {
-  return mapLines(view, (t) => (t.trim() === "" ? t : UNIT + t));
+  const unit = " ".repeat(indentWidth());
+  return mapLines(view, (t) => (t.trim() === "" ? t : unit + t));
 }
 export function outdent(view: EditorView): boolean {
-  return mapLines(view, (t) => t.replace(/^(\t| {1,2})/, ""));
+  const re = new RegExp(`^(\\t| {1,${indentWidth()}})`);
+  return mapLines(view, (t) => t.replace(re, ""));
 }

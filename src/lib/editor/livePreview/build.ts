@@ -3,7 +3,7 @@ import { syntaxTree } from "@codemirror/language";
 import { type Range } from "@codemirror/state";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { isElementActive, isLineActive } from "./reveal";
-import { imageBaseDir } from "./config";
+import { imageBaseDir, revealSimpleSource } from "./config";
 import { scanTagsInLine } from "./tagScan";
 import {
   ImageWidget,
@@ -92,6 +92,9 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
 
   const slice = (from: number, to: number) => state.doc.sliceString(from, to);
   const baseDir = state.facet(imageBaseDir);
+  // When false, simple-block markers (#, >, bullets) never reveal their source —
+  // they stay rendered even on the focused line (editor.revealSourceOnFocus).
+  const revealSource = state.facet(revealSimpleSource);
 
   // Tables are rendered as editable block widgets (via a StateField); skip any
   // inline decoration inside them.
@@ -229,7 +232,7 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
         }
         if (name === "HeaderMark") {
           // Line-level: the '#' is the only raw part; heading text renders either way.
-          if (!isLineActive(state, node.from, node.to)) {
+          if (!(revealSource && isLineActive(state, node.from, node.to))) {
             // Hide the '#' run plus a single trailing space.
             const after = slice(node.to, node.to + 1) === " " ? node.to + 1 : node.to;
             hide(node.from, after);
@@ -393,7 +396,7 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
           // marker, so hide the bullet entirely rather than doubling it up.
           const item = node.node.parent;
           if (item?.name === "ListItem" && item.getChild("Task")) {
-            if (!isElementActive(state, node.from, node.to)) {
+            if (!(revealSource && isElementActive(state, node.from, node.to))) {
               const after = slice(node.to, node.to + 1) === " " ? node.to + 1 : node.to;
               hide(node.from, after);
             }
@@ -401,7 +404,7 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
           }
           const markText = slice(node.from, node.to);
           if ((markText === "-" || markText === "*" || markText === "+") &&
-              !isElementActive(state, node.from, node.to)) {
+              !(revealSource && isElementActive(state, node.from, node.to))) {
             replaceWith(node.from, node.to, new BulletWidget());
           }
           return;
@@ -420,7 +423,7 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
         }
         if (name === "QuoteMark") {
           // Line-level: showing '>' doesn't change the rendered quote styling.
-          if (!isLineActive(state, node.from, node.to)) {
+          if (!(revealSource && isLineActive(state, node.from, node.to))) {
             const after = slice(node.to, node.to + 1) === " " ? node.to + 1 : node.to;
             hide(node.from, after);
           }
