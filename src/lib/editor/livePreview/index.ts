@@ -11,6 +11,7 @@ import { buildDecorations } from "./build";
 import { onTagClick, revealSimpleSource, inlineMathRender } from "./config";
 import { tableField } from "./tableField";
 import { mathField } from "./mathField";
+import { inlineMathTooltipField } from "./mathTooltip";
 import { linkRefsField } from "./linkRefs";
 import { clearActiveTable } from "./TableWidget";
 import { openUrl } from "../../ipc/commands";
@@ -248,6 +249,14 @@ const livePreviewTheme = EditorView.theme({
   ".cm-md-strike": { textDecoration: "line-through", opacity: "0.7" },
   // Inline math rendered in place of `$…$`.
   ".cm-md-inline-math": { cursor: "text", padding: "0 0.1em" },
+  // Live preview tooltip shown below `$…$` while editing it (Typora-style).
+  ".cm-md-math-tooltip": { padding: "0.25em 0.6em" },
+  ".cm-tooltip:has(.cm-md-math-tooltip)": {
+    borderRadius: "6px",
+    border: "1px solid var(--border, #ccc)",
+    background: "var(--menu-bg, #fff)",
+    boxShadow: "0 2px 10px rgba(0, 0, 0, 0.18)",
+  },
   // Idle block render (caret outside a `$$` / ```math block). No background at
   // rest so it reads like normal content. `$$` renders are `hoverable` (a subtle
   // box + "Math" hint appear on hover); ```math renders are plain. NOTE: use
@@ -547,6 +556,7 @@ export function livePreview(): Extension {
     linkRefsField,
     tableField,
     mathField,
+    inlineMathTooltipField,
     livePreviewPlugin,
     livePreviewTheme,
     interactionHandlers,
