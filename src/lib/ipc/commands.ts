@@ -32,8 +32,8 @@ export const readDocument = (relPath: string) =>
   invoke<DocumentContent>("read_document", { relPath });
 export const writeDocument = (relPath: string, content: string) =>
   invoke<DocumentMeta>("write_document", { relPath, content });
-export const createDocument = (folder: string, title: string) =>
-  invoke<DocumentMeta>("create_document", { folder, title });
+export const createDocument = (folder: string, title: string, eol: "lf" | "crlf" = "lf") =>
+  invoke<DocumentMeta>("create_document", { folder, title, eol });
 export const deleteDocument = (relPath: string) =>
   invoke<void>("delete_document", { relPath });
 

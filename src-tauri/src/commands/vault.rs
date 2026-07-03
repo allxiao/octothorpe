@@ -143,6 +143,7 @@ pub fn write_document(
 pub fn create_document(
     folder: String,
     title: String,
+    eol: String,
     state: State<AppState>,
 ) -> AppResult<DocumentMeta> {
     let vguard = state.vault.lock().unwrap();
@@ -156,7 +157,8 @@ pub fn create_document(
         n += 1;
     }
     let abs = vault.abs_path(&rel);
-    document::write_document(&abs, &format!("# {title}\n\n"))?;
+    let nl = if eol == "crlf" { "\r\n" } else { "\n" };
+    document::write_document(&abs, &format!("# {title}{nl}{nl}"))?;
     record_write(&state, &rel, &abs);
 
     let mut dguard = state.db.lock().unwrap();

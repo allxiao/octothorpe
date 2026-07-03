@@ -10,6 +10,7 @@
   import { imageBaseDir, onTagClick, revealSimpleSource } from "./livePreview/config";
   import { resolveImageFsPath } from "./livePreview/build";
   import { emojiCompletions } from "./emoji";
+  import * as ipc from "../ipc/commands";
   import {
     COMMANDS,
     blockState as computeBlockState,
@@ -128,16 +129,19 @@
     return view ? redoDepth(view.state) > 0 : false;
   }
 
-  /** Selected text (joined across ranges), or the current line if nothing is selected. */
+  /** Selected text (joined across ranges), or the current line if nothing is
+   *  selected — unless `editor.copyWholeLine` is off, in which case empty. */
   function copyText(): string {
     if (!view) return "";
     const { state } = view;
     const ranges = state.selection.ranges.filter((r) => !r.empty);
     if (ranges.length) return ranges.map((r) => state.sliceDoc(r.from, r.to)).join("\n");
+    if (!editorPrefs.get<boolean>("copyWholeLine")) return "";
     return state.doc.lineAt(state.selection.main.head).text;
   }
 
-  /** Like copyText, but removes it from the document (the whole line if no selection). */
+  /** Like copyText, but removes it from the document. Cuts the whole line when
+   *  nothing is selected, unless `editor.copyWholeLine` is off (then a no-op). */
   function cutText(): string {
     if (!view) return "";
     const { state } = view;
@@ -148,6 +152,7 @@
       view.focus();
       return text;
     }
+    if (!editorPrefs.get<boolean>("copyWholeLine")) return "";
     const line = state.doc.lineAt(state.selection.main.head);
     const to = Math.min(line.to + 1, state.doc.length); // include the trailing newline
     view.dispatch({ changes: { from: line.from, to }, selection: { anchor: line.from } });
@@ -239,6 +244,31 @@
         autocompleteComp.of(autocompleteExt()),
         revealComp.of(revealSimpleSource.of(editorPrefs.get<boolean>("revealSourceOnFocus"))),
         spellComp.of(spellAttrs()),
+        // Copy/cut behavior (editor.copyWholeLine / copyMarkdownAsPlain). Only
+        // intercept when a preference diverges from CodeMirror's native default.
+        EditorView.domEventHandlers({
+          copy: (event, v) => {
+            const empty = v.state.selection.ranges.every((r) => r.empty);
+            const plain = editorPrefs.get<boolean>("copyMarkdownAsPlain");
+            const noWhole = empty && !editorPrefs.get<boolean>("copyWholeLine");
+            if (!plain && !noWhole) return false;
+            event.preventDefault();
+            const src = copyText();
+            if (plain && src) {
+              void ipc.markdownToPlaintext(src).then((t) => ipc.clipboardWriteText(t)).catch(() => {});
+            } else {
+              event.clipboardData?.setData("text/plain", src);
+            }
+            return true;
+          },
+          cut: (event, v) => {
+            const empty = v.state.selection.ranges.every((r) => r.empty);
+            if (!(empty && !editorPrefs.get<boolean>("copyWholeLine"))) return false;
+            event.preventDefault(); // nothing selected + whole-line off → cut nothing
+            event.clipboardData?.setData("text/plain", "");
+            return true;
+          },
+        }),
         baseDirComp.of(imageBaseDir.of(baseDir)),
         onTagClick.of((tag) => ontagclick?.(tag)),
         EditorView.updateListener.of((u) => {

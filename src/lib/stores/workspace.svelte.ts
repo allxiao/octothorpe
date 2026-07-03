@@ -78,6 +78,14 @@ function fileUrl(path: string): string {
   return "file:///" + encodeURI(fwd);
 }
 
+/** Rewrite line endings to the configured style (editor.lineEnding). CodeMirror
+ *  keeps content as `\n` internally, so this only matters at write time. */
+function normalizeEol(content: string): string {
+  const crlf = preferences.get<string>("editor.lineEnding") === "crlf";
+  const lf = content.replace(/\r\n/g, "\n");
+  return crlf ? lf.replace(/\n/g, "\r\n") : lf;
+}
+
 class Workspace {
   root = $state<string | null>(null);
   tree = $state<TreeNode[]>([]);
@@ -231,7 +239,12 @@ class Workspace {
   async editCopy() {
     try {
       const text = this.#editor?.copyText() ?? "";
-      if (text) await ipc.clipboardWriteText(text);
+      if (text) {
+        const out = preferences.get<boolean>("editor.copyMarkdownAsPlain")
+          ? await ipc.markdownToPlaintext(text)
+          : text;
+        await ipc.clipboardWriteText(out);
+      }
     } catch (e) {
       this.status = `Copy failed: ${e}`;
     }
@@ -628,7 +641,7 @@ class Workspace {
     }
     if (this.standalonePath) {
       try {
-        await ipc.writeFile(this.standalonePath, this.content);
+        await ipc.writeFile(this.standalonePath, normalizeEol(this.content));
         this.dirty = false;
         this.externalChanged = false;
         this.status = "Saved";
@@ -639,7 +652,7 @@ class Workspace {
     }
     if (!this.activeRelPath) return;
     try {
-      await ipc.writeDocument(this.activeRelPath, this.content);
+      await ipc.writeDocument(this.activeRelPath, normalizeEol(this.content));
       this.dirty = false;
       this.externalChanged = false;
       this.status = "Saved";
@@ -665,7 +678,7 @@ class Workspace {
       }
       const target = await ipc.pickSavePath(defaultPath);
       if (!target) return;
-      await ipc.writeFile(target, this.content);
+      await ipc.writeFile(target, normalizeEol(this.content));
       const doc = await ipc.openPath(target);
       if (doc.relPath) {
         await this.refresh();
@@ -742,7 +755,8 @@ class Workspace {
 
   async newNote(folder = "") {
     try {
-      const meta = await ipc.createDocument(folder, "Untitled");
+      const eol = preferences.get<string>("editor.lineEnding") === "crlf" ? "crlf" : "lf";
+      const meta = await ipc.createDocument(folder, "Untitled", eol);
       await this.refresh();
       await this.openDoc(meta.relPath);
     } catch (e) {
