@@ -253,8 +253,8 @@ const livePreviewTheme = EditorView.theme({
   // box + "Math" hint appear on hover); ```math renders are plain.
   ".cm-md-math-block": {
     position: "relative",
-    margin: "0.2em 0",
-    padding: "0.15em 0.8em",
+    margin: "0.3em 0",
+    padding: "0.5em 0.8em",
     overflowX: "auto",
     cursor: "text",
     borderRadius: "6px",
@@ -287,8 +287,8 @@ const livePreviewTheme = EditorView.theme({
   // Live preview rendered *below* the editing box (a block widget from the
   // mathField StateField, so it never shares the last line's caret position).
   ".cm-md-math-preview": {
-    margin: "0.15em 0 0.3em",
-    padding: "0.15em 0",
+    margin: "0.2em 0 0.4em",
+    padding: "0.45em 0",
     overflowX: "auto",
   },
   ".cm-md-math-preview .cm-widgetBuffer": { display: "none" },
