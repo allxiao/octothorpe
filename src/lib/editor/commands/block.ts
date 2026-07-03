@@ -115,6 +115,46 @@ export function insertParagraphAfter(view: EditorView): boolean {
 // with no further fence chars (so a bare closing ``` on its own line isn't matched).
 const OPEN_FENCE_RE = /^(\s*)(`{3,}|~{3,})([^`~]*)$/;
 
+/** A line that is exactly a `$$` math-block delimiter (optional surrounding space). */
+export const MATH_FENCE_RE = /^\s*\$\$\s*$/;
+
+/**
+ * Pressing Enter at the end of a just-typed opening `$$` auto-completes the
+ * block: keep the opener, add a blank middle line (caret lands here), and a
+ * closing `$$` — mirroring autoCodeFence. Returns false (so the default newline
+ * applies) when the line isn't an unclosed `$$` opener.
+ */
+export function autoMathBlock(view: EditorView): boolean {
+  const { state } = view;
+  const sel = state.selection.main;
+  if (!sel.empty) return false;
+  const line = state.doc.lineAt(sel.head);
+  if (sel.head !== line.to) return false; // only at end of line
+  if (!MATH_FENCE_RE.test(line.text)) return false;
+
+  // Opening position? An even number of `$$` lines strictly above means this one
+  // opens (odd would mean the caret sits inside an already-open block).
+  let above = 0;
+  for (let n = 1; n < line.number; n++) {
+    if (MATH_FENCE_RE.test(state.doc.line(n).text)) above++;
+  }
+  if (above % 2 !== 0) return false;
+
+  // Already closed by a `$$` somewhere below? Then just insert a normal newline.
+  for (let n = line.number + 1; n <= state.doc.lines; n++) {
+    if (MATH_FENCE_RE.test(state.doc.line(n).text)) return false;
+  }
+
+  const indent = /^\s*/.exec(line.text)![0];
+  // The closing `$$` lands at EOF here; a transaction filter guarantees a line
+  // after it so the caret can still leave the block downward.
+  const insert = "\n" + indent + "\n" + indent + "$$";
+  const anchor = line.to + 1 + indent.length; // start of the blank middle line
+  view.dispatch({ changes: { from: line.to, insert }, selection: { anchor }, scrollIntoView: true });
+  view.focus();
+  return true;
+}
+
 /**
  * Pressing Enter at the end of a just-typed opening fence (``` or ```lang)
  * auto-completes the block: keep the opener, add a blank middle line (caret

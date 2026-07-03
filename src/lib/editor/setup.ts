@@ -8,7 +8,7 @@ import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
 import { markdownLang } from "./markdownLang";
 import { COMMANDS } from "./commands";
 import { autoTable, enterTableUp, enterTableDown } from "./commands/table";
-import { autoCodeFence, codeFenceBackspace, codeLangDown, codeLangRight } from "./commands/block";
+import { autoCodeFence, autoMathBlock, codeFenceBackspace, codeLangDown, codeLangRight, MATH_FENCE_RE } from "./commands/block";
 import { FENCE_RE } from "./commands/code";
 import { isRowLine, isDelimiterRow } from "./commands/table";
 
@@ -28,6 +28,11 @@ const ensureLineAfterTrailingBlock = EditorState.transactionFilter.of((tr) => {
     let fences = 0;
     for (let n = 1; n <= lastN; n++) if (FENCE_RE.test(doc.line(n).text)) fences++;
     needsLine = fences % 2 === 0;
+  } else if (MATH_FENCE_RE.test(lastText)) {
+    // `$$` math block: append when it closes a block (even number of delimiters).
+    let marks = 0;
+    for (let n = 1; n <= lastN; n++) if (MATH_FENCE_RE.test(doc.line(n).text)) marks++;
+    needsLine = marks % 2 === 0;
   } else if (isRowLine(lastText)) {
     // GFM table: a contiguous run of rows ending the doc, with a delimiter row.
     let top = lastN;
@@ -155,6 +160,7 @@ export function baseExtensions(onSave?: () => void): Extension[] {
       },
       indentWithTab,
       { key: "Backspace", run: codeFenceBackspace },
+      { key: "Enter", run: autoMathBlock },
       { key: "Enter", run: autoCodeFence },
       { key: "Enter", run: autoTable },
       { key: "ArrowUp", run: enterTableUp },
