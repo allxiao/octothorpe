@@ -10,6 +10,7 @@ import { syntaxTree } from "@codemirror/language";
 import { buildDecorations } from "./build";
 import { onTagClick, revealSimpleSource, inlineMathRender } from "./config";
 import { tableField } from "./tableField";
+import { mathField } from "./mathField";
 import { linkRefsField } from "./linkRefs";
 import { clearActiveTable } from "./TableWidget";
 import { openUrl } from "../../ipc/commands";
@@ -257,15 +258,18 @@ const livePreviewTheme = EditorView.theme({
     background: "var(--code-block-bg, rgba(135, 131, 120, 0.1))",
   },
   // Live preview shown below the editable box while the caret is inside a block.
-  // It hangs off the bottom of the code box (which has square bottom corners
-  // here because the preview continues it).
+  // Rendered as an inline widget with display:block (like the image preview), so
+  // it sits on its own line under the source box.
   ".cm-md-math-preview": {
+    display: "block",
+    margin: "0.35em 0",
     padding: "0.5em 0.8em",
     overflowX: "auto",
-    borderRadius: "0 0 6px 6px",
-    borderTop: "1px dashed var(--border, #ccc)",
+    borderRadius: "6px",
+    border: "1px dashed var(--border, #ccc)",
     background: "var(--code-block-bg, rgba(135, 131, 120, 0.1))",
   },
+  ".cm-md-math-preview .cm-widgetBuffer": { display: "none" },
   ".cm-md-math-error": { color: "#e00", fontFamily: "var(--editor-font, monospace)" },
   ".cm-md-link": { color: "#3b82f6", textDecoration: "underline", cursor: "pointer" },
   // A reference link with no matching definition: dashed underline + a small
@@ -490,6 +494,7 @@ export function livePreview(): Extension {
   return [
     linkRefsField,
     tableField,
+    mathField,
     livePreviewPlugin,
     livePreviewTheme,
     interactionHandlers,
