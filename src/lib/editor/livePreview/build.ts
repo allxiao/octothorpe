@@ -180,16 +180,10 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
 
           codeRanges.push({ from: node.from, to: node.to });
 
-          // ```` ```math ```` renders like a `$$` block: idle → the rendered
-          // math (handled by the mathField StateField, which can emit the
-          // block-replace a plugin can't); while the caret is inside → the code
-          // box, with a live preview rendered below by mathField.
-          const langInfo = info ? slice(info.from, info.to).trim() : "";
-          const isMathFence = langInfo === "math";
-          const mathFenceActive = isMathFence && isElementActive(state, node.from, node.to);
-          if (isMathFence && !mathFenceActive) {
-            return false; // idle: rendered by mathField (codeRange already recorded)
-          }
+          // ```` ```math ```` is just a code block (rendered as the box below),
+          // with one extra: a live preview rendered *below* it by the mathField
+          // StateField while the caret is inside. Unlike a `$$` block it is never
+          // replaced by rendered math when idle.
 
           // Structural indent (list/quote nesting) sits before the fence and is
           // excluded from the code nodes. Inset the box by it so the block lines

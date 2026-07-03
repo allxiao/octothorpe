@@ -58,23 +58,21 @@ function build(state: EditorState): DecorationSet {
         return false;
       }
 
+      // ```` ```math ```` stays a code block (rendered by the live-preview
+      // plugin); the only math-specific decoration is a preview below it while
+      // it is being edited. It is never replaced by rendered math when idle.
       if (name === "FencedCode") {
         const n = node.node;
         const marks = n.getChildren("CodeMark");
         if (marks.length < 2) return false;
         const info = n.getChild("CodeInfo");
         if (!info || slice(info.from, info.to).trim() !== "math") return false;
-        const openLine = doc.lineAt(node.from);
+        if (!isElementActive(state, node.from, node.to)) return false; // idle: code box
         const closeLine = doc.lineAt(marks[marks.length - 1].from);
-        const first = openLine.number + 1;
+        const first = doc.lineAt(node.from).number + 1;
         const last = closeLine.number - 1;
         const latex = first <= last ? slice(doc.line(first).from, doc.line(last).to) : "";
-        if (isElementActive(state, node.from, node.to)) {
-          if (latex.trim()) pushPreview(closeLine.to, latex);
-          return false;
-        }
-        const enterPos = first <= last ? doc.line(first).from : openLine.to;
-        pushRender(openLine.from, closeLine.to, latex, enterPos, first > last);
+        if (latex.trim()) pushPreview(closeLine.to, latex);
         return false;
       }
 
