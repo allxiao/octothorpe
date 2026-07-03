@@ -148,7 +148,7 @@
             "control": "radio",
             "order": 1,
             "options": [
-              { "value": "auto", "label": "Auto (Recommended)" },
+              { "value": "auto", "label": "Auto" },
               { "value": "custom", "label": "Customized", "field": "appearance.fontSize" }
             ]
           }
