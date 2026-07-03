@@ -1,5 +1,5 @@
 import { WidgetType, type EditorView } from "@codemirror/view";
-import { renderMath } from "../math/render";
+import { renderMath, measuredMathHeight } from "../math/render";
 
 /**
  * Inline `$…$` rendered in place of its source. Clicking it drops the caret just
@@ -112,6 +112,13 @@ export class BlockMathWidget extends WidgetType {
   }
   ignoreEvent() {
     return true;
+  }
+  // CM doesn't measure these block widgets into its height map — give it an
+  // accurate estimate (measured render + ~18px of vertical padding) so clicks and
+  // Up/Down stay aligned. An empty placeholder is roughly one line.
+  get estimatedHeight() {
+    if (this.latex.trim() === "") return 34;
+    return Math.ceil(measuredMathHeight(this.latex)) + 18;
   }
 }
 

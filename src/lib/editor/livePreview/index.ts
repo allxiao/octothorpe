@@ -388,7 +388,7 @@ const livePreviewTheme = EditorView.theme({
     padding: "0.05em 0.35em",
     cursor: "pointer",
   },
-  ".cm-md-table-wrap": { position: "relative", margin: "0.9em 0 0.4em" },
+  ".cm-md-table-wrap": { position: "relative", padding: "0.9em 0 0.4em" },
   ".cm-md-table-scroll": { overflowX: "auto" },
   ".cm-md-table": {
     borderCollapse: "collapse",

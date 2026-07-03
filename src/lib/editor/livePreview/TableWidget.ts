@@ -132,6 +132,15 @@ export class TableWidget extends WidgetType {
     return true;
   }
 
+  // CM doesn't measure these block widgets into its height map — without an
+  // estimate it guesses ~1 line for the whole table, desyncing the map so clicks
+  // and Up/Down below the table jump. Estimate from the row count (+ the wrap's
+  // vertical margin). Rough is fine; it just needs to be close.
+  get estimatedHeight() {
+    const model = parseTableText(this.md);
+    return (model.rows.length + 1) * 24 + 22;
+  }
+
   /** Current table range in the document (start is stable; end may shift after edits). */
   private range(view: EditorView): { from: number; to: number } {
     const cur = findTables(view.state, this.from, this.from).find((t) => t.from === this.from);
