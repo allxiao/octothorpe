@@ -48,6 +48,7 @@ export class BlockMathWidget extends WidgetType {
     readonly latex: string,
     readonly enterPos = -1,
     readonly insertLine = false,
+    readonly hoverable = false,
   ) {
     super();
   }
@@ -55,21 +56,25 @@ export class BlockMathWidget extends WidgetType {
     return (
       other.latex === this.latex &&
       other.enterPos === this.enterPos &&
-      other.insertLine === this.insertLine
+      other.insertLine === this.insertLine &&
+      other.hoverable === this.hoverable
     );
   }
   toDOM(view: EditorView) {
     const div = document.createElement("div");
     const rendered = this.enterPos >= 0;
     div.className = rendered ? "cm-md-math-block" : "cm-md-math-preview";
+    // Only `$$` renders get the hover box + "Math" hint; ```math renders are
+    // plain (they're code blocks, entered by clicking with no hover affordance).
+    if (rendered && this.hoverable) div.classList.add("cm-md-math-hoverable");
     if (rendered && this.latex.trim() === "") {
       // Empty block: a clickable placeholder (KaTeX would render nothing).
       div.classList.add("cm-md-math-empty");
       div.textContent = "Empty math block — click to edit";
     } else {
       div.innerHTML = renderMath(this.latex, true);
-      // Idle render: a small "Math" hint on hover signals it's editable math.
-      if (rendered) {
+      // Idle `$$` render: a small "Math" hint on hover signals it's editable.
+      if (rendered && this.hoverable) {
         const hint = document.createElement("span");
         hint.className = "cm-md-math-hint";
         hint.textContent = "Math";

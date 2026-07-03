@@ -249,8 +249,8 @@ const livePreviewTheme = EditorView.theme({
   // Inline math rendered in place of `$…$`.
   ".cm-md-inline-math": { cursor: "text", padding: "0 0.1em" },
   // Idle block render (caret outside a `$$` / ```math block). No background at
-  // rest so it reads like normal content; on hover a subtle box + a "Math" hint
-  // appear to signal it's editable math.
+  // rest so it reads like normal content. `$$` renders are `hoverable` (a subtle
+  // box + "Math" hint appear on hover); ```math renders are plain.
   ".cm-md-math-block": {
     position: "relative",
     margin: "0.2em 0",
@@ -260,7 +260,7 @@ const livePreviewTheme = EditorView.theme({
     borderRadius: "6px",
     transition: "background 0.1s",
   },
-  ".cm-md-math-block:hover": {
+  ".cm-md-math-hoverable:hover": {
     background: "var(--code-block-bg, rgba(135, 131, 120, 0.1))",
   },
   // KaTeX display math carries a default `margin: 1em 0`; drop it so rendered
@@ -283,7 +283,7 @@ const livePreviewTheme = EditorView.theme({
     transition: "opacity 0.1s",
     pointerEvents: "none",
   },
-  ".cm-md-math-block:hover .cm-md-math-hint": { opacity: "0.85" },
+  ".cm-md-math-hoverable:hover .cm-md-math-hint": { opacity: "0.85" },
   // Live preview rendered *below* the editing box (a block widget from the
   // mathField StateField, so it never shares the last line's caret position).
   ".cm-md-math-preview": {

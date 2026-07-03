@@ -18,10 +18,17 @@ function build(state: EditorState): DecorationSet {
   const ranges: Range<Decoration>[] = [];
 
   // Idle: replace the whole block with its rendered display math.
-  const pushRender = (from: number, to: number, latex: string, enterPos: number, insertLine: boolean) => {
+  const pushRender = (
+    from: number,
+    to: number,
+    latex: string,
+    enterPos: number,
+    insertLine: boolean,
+    hoverable: boolean,
+  ) => {
     ranges.push(
       Decoration.replace({
-        widget: new BlockMathWidget(latex, enterPos, insertLine),
+        widget: new BlockMathWidget(latex, enterPos, insertLine, hoverable),
         block: true,
       }).range(from, to),
     );
@@ -54,25 +61,32 @@ function build(state: EditorState): DecorationSet {
         // Non-empty: click drops the caret into the first body line. Empty
         // (`$$\n$$`): click inserts a blank line after the opener to type into.
         const enterPos = first <= last ? doc.line(first).from : startLine.to;
-        pushRender(startLine.from, endLine.to, latex, enterPos, first > last);
+        pushRender(startLine.from, endLine.to, latex, enterPos, first > last, true);
         return false;
       }
 
-      // ```` ```math ```` stays a code block (rendered by the live-preview
-      // plugin); the only math-specific decoration is a preview below it while
-      // it is being edited. It is never replaced by rendered math when idle.
+      // ```` ```math ```` renders as math when idle (like `$$`), but WITHOUT the
+      // hover box/marker — it's a plain code block whose only extra is a preview
+      // below its edit area while the caret is inside.
       if (name === "FencedCode") {
         const n = node.node;
         const marks = n.getChildren("CodeMark");
         if (marks.length < 2) return false;
         const info = n.getChild("CodeInfo");
         if (!info || slice(info.from, info.to).trim() !== "math") return false;
-        if (!isElementActive(state, node.from, node.to)) return false; // idle: code box
+        const openLine = doc.lineAt(node.from);
         const closeLine = doc.lineAt(marks[marks.length - 1].from);
-        const first = doc.lineAt(node.from).number + 1;
+        const first = openLine.number + 1;
         const last = closeLine.number - 1;
         const latex = first <= last ? slice(doc.line(first).from, doc.line(last).to) : "";
-        if (latex.trim()) pushPreview(closeLine.to, latex);
+        if (isElementActive(state, node.from, node.to)) {
+          // Editing: the code box is rendered by the live-preview plugin; add
+          // only the preview below it.
+          if (latex.trim()) pushPreview(closeLine.to, latex);
+          return false;
+        }
+        const enterPos = first <= last ? doc.line(first).from : openLine.to;
+        pushRender(openLine.from, closeLine.to, latex, enterPos, first > last, false);
         return false;
       }
 
