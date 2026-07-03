@@ -35,8 +35,9 @@ export class InlineMathWidget extends WidgetType {
 /**
  * Display-mode block math. Serves two roles, keyed on `enterPos`:
  *   - idle full-block render (`enterPos >= 0`): replaces the whole `$$…$$` /
- *     ```` ```math ```` block; clicking it drops the caret inside so the source
- *     box appears for editing;
+ *     ```` ```math ```` block; clicking it puts the caret inside so the source
+ *     box appears for editing. For an empty block (no body line) `insertLine` is
+ *     set, so the click first inserts a blank line to type into;
  *   - live preview (`enterPos < 0`): shown *below* the editable box while the
  *     caret is inside the block; not interactive.
  * `eq` keys on the LaTeX (and role) so it re-renders live as the body is edited
@@ -46,21 +47,41 @@ export class BlockMathWidget extends WidgetType {
   constructor(
     readonly latex: string,
     readonly enterPos = -1,
+    readonly insertLine = false,
   ) {
     super();
   }
   eq(other: BlockMathWidget) {
-    return other.latex === this.latex && other.enterPos === this.enterPos;
+    return (
+      other.latex === this.latex &&
+      other.enterPos === this.enterPos &&
+      other.insertLine === this.insertLine
+    );
   }
   toDOM(view: EditorView) {
     const div = document.createElement("div");
     const rendered = this.enterPos >= 0;
     div.className = rendered ? "cm-md-math-block" : "cm-md-math-preview";
-    div.innerHTML = renderMath(this.latex, true);
+    if (rendered && this.latex.trim() === "") {
+      // Empty block: a clickable placeholder (KaTeX would render nothing).
+      div.classList.add("cm-md-math-empty");
+      div.textContent = "Empty math block — click to edit";
+    } else {
+      div.innerHTML = renderMath(this.latex, true);
+    }
     if (rendered) {
       div.addEventListener("mousedown", (e) => {
         e.preventDefault();
-        view.dispatch({ selection: { anchor: this.enterPos } });
+        if (this.insertLine) {
+          // No body line to type into (e.g. `$$\n$$`): open one up.
+          view.dispatch({
+            changes: { from: this.enterPos, insert: "\n" },
+            selection: { anchor: this.enterPos + 1 },
+            scrollIntoView: true,
+          });
+        } else {
+          view.dispatch({ selection: { anchor: this.enterPos } });
+        }
         view.focus();
       });
     }

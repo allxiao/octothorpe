@@ -255,10 +255,10 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
           );
           // Editing a ```math block: show the live render below the code box.
           if (mathFenceActive) {
-            emitMathPreview(
-              blockPreviewPos(firstContent, lastContent, closeLine.from),
-              blockLatex(firstContent, lastContent),
-            );
+            const previewLatex = blockLatex(firstContent, lastContent);
+            if (previewLatex.trim()) {
+              emitMathPreview(blockPreviewPos(firstContent, lastContent, closeLine.from), previewLatex);
+            }
           }
           // Don't descend: CodeText stays real text (natively highlighted).
           return false;
@@ -297,6 +297,11 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
             return false; // idle: rendered by mathField (codeRange already recorded)
           }
 
+          // Empty (`$$\n$$` with no body line): leave the raw delimiters visible
+          // and editable rather than collapsing to an unreachable void. Entering
+          // it via the idle render inserts a blank body line first.
+          if (first > last) return false;
+
           // Editing: collapse the `$$` fence lines, box the body, preview below.
           const openMark = marks[0];
           const closeMark = marks[marks.length - 1];
@@ -311,7 +316,7 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
             if (ln === last) cls += " cm-md-code-bottom";
             decos.push(Decoration.line({ class: cls }).range(line.from));
           }
-          emitMathPreview(blockPreviewPos(first, last, endLine.from), latex);
+          if (latex.trim()) emitMathPreview(blockPreviewPos(first, last, endLine.from), latex);
           return false;
         }
 

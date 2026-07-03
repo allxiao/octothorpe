@@ -17,10 +17,10 @@ function build(state: EditorState): DecorationSet {
   const slice = (from: number, to: number) => doc.sliceString(from, to);
   const ranges: Range<Decoration>[] = [];
 
-  const push = (from: number, to: number, latex: string, enterPos: number) => {
+  const push = (from: number, to: number, latex: string, enterPos: number, insertLine: boolean) => {
     ranges.push(
       Decoration.replace({
-        widget: new BlockMathWidget(latex, enterPos),
+        widget: new BlockMathWidget(latex, enterPos, insertLine),
         block: true,
       }).range(from, to),
     );
@@ -38,9 +38,12 @@ function build(state: EditorState): DecorationSet {
         const endLine = doc.lineAt(node.to);
         const first = startLine.number + 1;
         const last = endLine.number - 1;
-        const latex = first <= last ? slice(doc.line(first).from, doc.line(last).to) : "";
-        const enterPos = first <= doc.lines ? doc.line(first).from : node.from;
-        push(startLine.from, endLine.to, latex, enterPos);
+        const empty = first > last;
+        const latex = empty ? "" : slice(doc.line(first).from, doc.line(last).to);
+        // Non-empty: click drops the caret into the first body line. Empty
+        // (`$$\n$$`): click inserts a blank line after the opener to type into.
+        const enterPos = empty ? startLine.to : doc.line(first).from;
+        push(startLine.from, endLine.to, latex, enterPos, empty);
         return false;
       }
 
@@ -55,8 +58,10 @@ function build(state: EditorState): DecorationSet {
         const closeLine = doc.lineAt(marks[marks.length - 1].from);
         const first = openLine.number + 1;
         const last = closeLine.number - 1;
-        const latex = first <= last ? slice(doc.line(first).from, doc.line(last).to) : "";
-        push(openLine.from, closeLine.to, latex, doc.line(first).from);
+        const empty = first > last;
+        const latex = empty ? "" : slice(doc.line(first).from, doc.line(last).to);
+        const enterPos = empty ? openLine.to : doc.line(first).from;
+        push(openLine.from, closeLine.to, latex, enterPos, empty);
         return false;
       }
 

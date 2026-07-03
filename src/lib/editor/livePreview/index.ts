@@ -270,6 +270,14 @@ const livePreviewTheme = EditorView.theme({
     background: "var(--code-block-bg, rgba(135, 131, 120, 0.1))",
   },
   ".cm-md-math-preview .cm-widgetBuffer": { display: "none" },
+  // Placeholder for an empty block (`$$\n$$`) — clickable to open a body line.
+  ".cm-md-math-empty": {
+    textAlign: "center",
+    color: "var(--text-muted, #999)",
+    fontStyle: "italic",
+    fontFamily: "system-ui, sans-serif",
+    fontSize: "0.85em",
+  },
   ".cm-md-math-error": { color: "#e00", fontFamily: "var(--editor-font, monospace)" },
   ".cm-md-link": { color: "#3b82f6", textDecoration: "underline", cursor: "pointer" },
   // A reference link with no matching definition: dashed underline + a small
