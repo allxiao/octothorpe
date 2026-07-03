@@ -4,6 +4,7 @@
 import type { EditorView } from "@codemirror/view";
 import { insertText, mapLines, markerGap, selectedLines } from "./util";
 import { detectFence, FENCE_RE } from "./code";
+import { mathBlockRanges } from "../livePreview/mathField";
 
 const QUOTE_RE = /^(\s*)>\s?/;
 
@@ -282,4 +283,52 @@ export function codeFenceBackspace(view: EditorView): boolean {
   view.dispatch({ changes, selection: { anchor: openLine.from }, scrollIntoView: true });
   view.focus();
   return true;
+}
+
+// An idle-rendered math block is atomic, so plain Up/Down steps over it. These
+// let the caret move *into* the block (to edit it): Down entering from the line
+// above lands on the first body line; Up entering from the line below lands at
+// the end of the last body line. Empty blocks (no body line) are left to the
+// normal skip — click their placeholder to open one.
+
+/** Down at the line just above an idle math block enters its first body line. */
+export function mathBlockDown(view: EditorView): boolean {
+  const { state } = view;
+  const sel = state.selection.main;
+  if (!sel.empty) return false;
+  const curLine = state.doc.lineAt(sel.head).number;
+  for (const r of mathBlockRanges(state)) {
+    const startLine = state.doc.lineAt(r.from).number;
+    const endLine = state.doc.lineAt(r.to).number;
+    if (startLine === curLine + 1 && endLine - 1 >= startLine + 1) {
+      view.dispatch({
+        selection: { anchor: state.doc.line(startLine + 1).from },
+        scrollIntoView: true,
+      });
+      view.focus();
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Up at the line just below an idle math block enters its last body line. */
+export function mathBlockUp(view: EditorView): boolean {
+  const { state } = view;
+  const sel = state.selection.main;
+  if (!sel.empty) return false;
+  const curLine = state.doc.lineAt(sel.head).number;
+  for (const r of mathBlockRanges(state)) {
+    const startLine = state.doc.lineAt(r.from).number;
+    const endLine = state.doc.lineAt(r.to).number;
+    if (endLine === curLine - 1 && endLine - 1 >= startLine + 1) {
+      view.dispatch({
+        selection: { anchor: state.doc.line(endLine - 1).to },
+        scrollIntoView: true,
+      });
+      view.focus();
+      return true;
+    }
+  }
+  return false;
 }

@@ -8,7 +8,7 @@ import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
 import { markdownLang } from "./markdownLang";
 import { COMMANDS } from "./commands";
 import { autoTable, enterTableUp, enterTableDown } from "./commands/table";
-import { autoCodeFence, autoMathBlock, codeFenceBackspace, codeLangDown, codeLangRight, MATH_FENCE_RE } from "./commands/block";
+import { autoCodeFence, autoMathBlock, codeFenceBackspace, codeLangDown, codeLangRight, mathBlockDown, mathBlockUp, MATH_FENCE_RE } from "./commands/block";
 import { FENCE_RE } from "./commands/code";
 import { isRowLine, isDelimiterRow } from "./commands/table";
 
@@ -165,6 +165,8 @@ export function baseExtensions(onSave?: () => void): Extension[] {
       { key: "Enter", run: autoTable },
       { key: "ArrowUp", run: enterTableUp },
       { key: "ArrowDown", run: enterTableDown },
+      { key: "ArrowDown", run: mathBlockDown },
+      { key: "ArrowUp", run: mathBlockUp },
       { key: "ArrowDown", run: codeLangDown },
       { key: "ArrowRight", run: codeLangRight },
       ...paragraphKeymap,
