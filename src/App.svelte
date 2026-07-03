@@ -17,8 +17,12 @@
 
   onMount(() => {
     void boot();
+    window.addEventListener("wheel", onWheel, { passive: false });
   });
-  onDestroy(() => unlistenDrop?.());
+  onDestroy(() => {
+    unlistenDrop?.();
+    window.removeEventListener("wheel", onWheel);
+  });
 
   async function boot() {
     await preferences.load();
@@ -41,6 +45,23 @@
     if (theme === "light" || theme === "dark") el.dataset.theme = theme;
     else delete el.dataset.theme;
   });
+
+  // Apply the whole-app zoom preference.
+  $effect(() => {
+    const pct = Number(preferences.get<string>("appearance.zoom")) || 100;
+    (document.documentElement.style as CSSStyleDeclaration & { zoom: string }).zoom = String(pct / 100);
+  });
+
+  // Ctrl + mouse-wheel steps the zoom preset (when appearance.zoomWithCtrlWheel is on).
+  const ZOOM_LEVELS = ["50", "67", "75", "80", "90", "100", "110", "125", "150", "175", "200"];
+  function onWheel(e: WheelEvent) {
+    if (!e.ctrlKey || !preferences.get<boolean>("appearance.zoomWithCtrlWheel")) return;
+    e.preventDefault();
+    const i = ZOOM_LEVELS.indexOf(preferences.get<string>("appearance.zoom"));
+    if (i < 0) return;
+    const next = e.deltaY < 0 ? Math.min(ZOOM_LEVELS.length - 1, i + 1) : Math.max(0, i - 1);
+    if (next !== i) preferences.set("appearance.zoom", ZOOM_LEVELS[next]);
+  }
 
   // New Window launches a fresh process; those skip restoring the last folder
   // (and may open straight onto an empty buffer). The main process applies the
@@ -160,7 +181,9 @@
       {/if}
     </div>
   </div>
-  <StatusBar />
+  {#if preferences.get("appearance.showStatusBar")}
+    <StatusBar />
+  {/if}
 </div>
 
 {#if workspace.insertTableOpen}

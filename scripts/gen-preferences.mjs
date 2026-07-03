@@ -51,6 +51,8 @@ function collectEntries(node, prefix, out) {
         min: spec.minimum,
         max: spec.maximum,
         step: ui.step,
+        inline: ui.inline,
+        unit: ui.unit,
       });
     }
   }
@@ -83,6 +85,8 @@ for (const catId of categoryOrder) {
     if (leaf.min !== undefined) entry.min = leaf.min;
     if (leaf.max !== undefined) entry.max = leaf.max;
     if (leaf.step !== undefined) entry.step = leaf.step;
+    if (leaf.inline !== undefined) entry.inline = leaf.inline;
+    if (leaf.unit !== undefined) entry.unit = leaf.unit;
     entry.__order = leaf.order;
     section.entries.push(entry);
   }

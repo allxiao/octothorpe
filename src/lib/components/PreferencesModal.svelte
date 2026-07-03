@@ -8,6 +8,11 @@
   let activeCat = $state(DESCRIPTOR[0]?.id ?? "");
   const current = $derived(DESCRIPTOR.find((c) => c.id === activeCat) ?? DESCRIPTOR[0]);
 
+  // Flat lookup so a radio option's inline `field` can find its entry to render.
+  const entryByKey = new Map<string, PrefEntry>(
+    DESCRIPTOR.flatMap((c) => c.sections.flatMap((s) => s.entries)).map((e) => [e.key, e]),
+  );
+
   // Last validation error, shown inline (set() rejects out-of-range/invalid values).
   let error = $state<string | null>(null);
 
@@ -31,6 +36,66 @@
 </script>
 
 <svelte:window onkeydown={onKeydown} />
+
+{#snippet controlBody(entry: PrefEntry)}
+  {#if entry.control === "toggle"}
+    <input
+      id={`pref-${entry.key}`}
+      type="checkbox"
+      checked={preferences.get<boolean>(entry.key)}
+      onchange={(e) => apply(entry, e.currentTarget.checked)}
+    />
+  {:else if entry.control === "select"}
+    <select
+      id={`pref-${entry.key}`}
+      value={preferences.get<string>(entry.key)}
+      onchange={(e) => apply(entry, e.currentTarget.value)}
+    >
+      {#each entry.options ?? [] as opt (opt.value)}
+        <option value={opt.value}>{opt.label}</option>
+      {/each}
+    </select>
+  {:else if entry.control === "radio"}
+    <div class="radios">
+      {#each entry.options ?? [] as opt (opt.value)}
+        <div class="radio">
+          <label>
+            <input
+              type="radio"
+              name={`pref-${entry.key}`}
+              value={opt.value}
+              checked={preferences.get<string>(entry.key) === opt.value}
+              onchange={() => apply(entry, opt.value)}
+            />
+            <span>{opt.label}</span>
+          </label>
+          {#if opt.field && preferences.get<string>(entry.key) === opt.value}
+            {@const fe = entryByKey.get(opt.field)}
+            {#if fe}{@render controlBody(fe)}{/if}
+          {/if}
+        </div>
+      {/each}
+    </div>
+  {:else if entry.control === "number"}
+    <input
+      id={`pref-${entry.key}`}
+      type="number"
+      min={entry.min}
+      max={entry.max}
+      step={entry.step ?? 1}
+      value={preferences.get<number>(entry.key)}
+      onchange={(e) => onNumber(entry, e.currentTarget.value)}
+    />
+    {#if entry.unit}<span class="unit">{entry.unit}</span>{/if}
+  {:else}
+    <input
+      id={`pref-${entry.key}`}
+      type="text"
+      value={preferences.get<string>(entry.key)}
+      onchange={(e) => apply(entry, e.currentTarget.value)}
+    />
+  {/if}
+{/snippet}
 
 <div
   class="backdrop"
@@ -64,49 +129,15 @@
           <section>
             <h4>{section.label}</h4>
             {#each section.entries as entry (entry.key)}
-              <div class="row">
-                <div class="meta">
-                  <label class="lbl" for={`pref-${entry.key}`}>{entry.label}</label>
-                  {#if entry.description}<p class="desc">{entry.description}</p>{/if}
+              {#if !entry.inline}
+                <div class="row">
+                  <div class="meta">
+                    <label class="lbl" for={`pref-${entry.key}`}>{entry.label}</label>
+                    {#if entry.description}<p class="desc">{entry.description}</p>{/if}
+                  </div>
+                  <div class="control">{@render controlBody(entry)}</div>
                 </div>
-                <div class="control">
-                  {#if entry.control === "toggle"}
-                    <input
-                      id={`pref-${entry.key}`}
-                      type="checkbox"
-                      checked={preferences.get<boolean>(entry.key)}
-                      onchange={(e) => apply(entry, e.currentTarget.checked)}
-                    />
-                  {:else if entry.control === "select"}
-                    <select
-                      id={`pref-${entry.key}`}
-                      value={preferences.get<string>(entry.key)}
-                      onchange={(e) => apply(entry, e.currentTarget.value)}
-                    >
-                      {#each entry.options ?? [] as opt (opt.value)}
-                        <option value={opt.value}>{opt.label}</option>
-                      {/each}
-                    </select>
-                  {:else if entry.control === "number"}
-                    <input
-                      id={`pref-${entry.key}`}
-                      type="number"
-                      min={entry.min}
-                      max={entry.max}
-                      step={entry.step ?? 1}
-                      value={preferences.get<number>(entry.key)}
-                      onchange={(e) => onNumber(entry, e.currentTarget.value)}
-                    />
-                  {:else}
-                    <input
-                      id={`pref-${entry.key}`}
-                      type="text"
-                      value={preferences.get<string>(entry.key)}
-                      onchange={(e) => apply(entry, e.currentTarget.value)}
-                    />
-                  {/if}
-                </div>
-              </div>
+              {/if}
             {/each}
           </section>
         {/each}
@@ -272,6 +303,31 @@
     width: 16px;
     height: 16px;
     cursor: pointer;
+  }
+  .radios {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: flex-end;
+  }
+  .radio {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .radio label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .radio input[type="radio"] {
+    cursor: pointer;
+  }
+  .unit {
+    font-size: 12px;
+    opacity: 0.6;
   }
   .err {
     margin-top: 16px;

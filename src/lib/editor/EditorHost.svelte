@@ -62,13 +62,18 @@
   const spellComp = new Compartment();
 
   const editorPrefs = preferences.scope("editor");
+  const appearancePrefs = preferences.scope("appearance");
 
   /** A CodeMirror theme carrying the preference-driven editor typography. */
   function typographyTheme() {
+    const size =
+      appearancePrefs.get<string>("fontSizeMode") === "custom"
+        ? appearancePrefs.get<number>("fontSize")
+        : 15;
     return EditorView.theme({
       ".cm-scroller": {
-        fontSize: `${editorPrefs.get<number>("fontSize")}px`,
-        lineHeight: String(editorPrefs.get<number>("lineHeight")),
+        fontSize: `${size}px`,
+        lineHeight: String(appearancePrefs.get<number>("lineHeight")),
       },
     });
   }
@@ -341,10 +346,11 @@
     }
   });
 
-  // Live-refresh editor typography when the font-size / line-height preferences change.
+  // Live-refresh editor typography when the appearance font preferences change.
   $effect(() => {
-    editorPrefs.get<number>("fontSize");
-    editorPrefs.get<number>("lineHeight");
+    appearancePrefs.get<string>("fontSizeMode");
+    appearancePrefs.get<number>("fontSize");
+    appearancePrefs.get<number>("lineHeight");
     if (view) view.dispatch({ effects: typographyComp.reconfigure(typographyTheme()) });
   });
 
