@@ -7,7 +7,7 @@
   import { closeBrackets, closeBracketsKeymap, autocompletion } from "@codemirror/autocomplete";
   import { baseExtensions } from "./setup";
   import { livePreview } from "./livePreview";
-  import { imageBaseDir, onTagClick, revealSimpleSource } from "./livePreview/config";
+  import { imageBaseDir, onTagClick, revealSimpleSource, inlineMathRender } from "./livePreview/config";
   import { resolveImageFsPath } from "./livePreview/build";
   import { emojiCompletions } from "./emoji";
   import * as ipc from "../ipc/commands";
@@ -58,11 +58,14 @@
   const autocompleteComp = new Compartment();
   // "Reveal source on focus" facet for simple blocks (editor.revealSourceOnFocus).
   const revealComp = new Compartment();
+  // Inline math rendering toggle (markdown.inlineMath).
+  const mathComp = new Compartment();
   // Spell-check content attribute (editor.spellCheck).
   const spellComp = new Compartment();
 
   const editorPrefs = preferences.scope("editor");
   const appearancePrefs = preferences.scope("appearance");
+  const markdownPrefs = preferences.scope("markdown");
 
   /** A CodeMirror theme carrying the preference-driven editor typography. */
   function typographyTheme() {
@@ -248,6 +251,7 @@
         autoPairComp.of(autoPairExt()),
         autocompleteComp.of(autocompleteExt()),
         revealComp.of(revealSimpleSource.of(editorPrefs.get<boolean>("revealSourceOnFocus"))),
+        mathComp.of(inlineMathRender.of(markdownPrefs.get<boolean>("inlineMath"))),
         spellComp.of(spellAttrs()),
         // Copy/cut behavior (editor.copyWholeLine / copyMarkdownAsPlain). Only
         // intercept when a preference diverges from CodeMirror's native default.
@@ -385,6 +389,12 @@
   $effect(() => {
     const reveal = editorPrefs.get<boolean>("revealSourceOnFocus");
     if (view) view.dispatch({ effects: revealComp.reconfigure(revealSimpleSource.of(reveal)) });
+  });
+
+  // Live-refresh inline math rendering (markdown.inlineMath).
+  $effect(() => {
+    const on = markdownPrefs.get<boolean>("inlineMath");
+    if (view) view.dispatch({ effects: mathComp.reconfigure(inlineMathRender.of(on)) });
   });
 
   // Live-refresh the spell-check content attribute.
