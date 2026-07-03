@@ -253,8 +253,8 @@ const livePreviewTheme = EditorView.theme({
   // appear to signal it's editable math.
   ".cm-md-math-block": {
     position: "relative",
-    margin: "0.4em 0",
-    padding: "0.3em 0.8em",
+    margin: "0.2em 0",
+    padding: "0.15em 0.8em",
     overflowX: "auto",
     cursor: "text",
     borderRadius: "6px",
@@ -263,6 +263,9 @@ const livePreviewTheme = EditorView.theme({
   ".cm-md-math-block:hover": {
     background: "var(--code-block-bg, rgba(135, 131, 120, 0.1))",
   },
+  // KaTeX display math carries a default `margin: 1em 0`; drop it so rendered
+  // blocks and previews stay compact within their own (smaller) padding.
+  ".cm-md-math-block .katex-display, .cm-md-math-preview .katex-display": { margin: "0" },
   // Small "Math" hint shown at the top-right of an idle render on hover.
   ".cm-md-math-hint": {
     position: "absolute",
@@ -284,8 +287,8 @@ const livePreviewTheme = EditorView.theme({
   // Live preview rendered *below* the editing box (a block widget from the
   // mathField StateField, so it never shares the last line's caret position).
   ".cm-md-math-preview": {
-    margin: "0.2em 0 0.5em",
-    padding: "0.3em 0",
+    margin: "0.15em 0 0.3em",
+    padding: "0.15em 0",
     overflowX: "auto",
   },
   ".cm-md-math-preview .cm-widgetBuffer": { display: "none" },
