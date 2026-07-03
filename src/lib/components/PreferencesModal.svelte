@@ -27,6 +27,13 @@
     apply(entry, n);
   }
 
+  /** A row with a `showWhen` is shown only while the referenced pref matches. */
+  function visible(entry: PrefEntry): boolean {
+    return (
+      !entry.showWhen || String(preferences.get(entry.showWhen.key)) === entry.showWhen.equals
+    );
+  }
+
   function onKeydown(e: KeyboardEvent) {
     if (e.key === "Escape") {
       e.preventDefault();
@@ -137,7 +144,7 @@
           <section>
             <h4>{section.label}</h4>
             {#each section.entries as entry (entry.key)}
-              {#if !entry.inline}
+              {#if !entry.inline && visible(entry)}
                 <div class="row">
                   <div class="meta">
                     <label class="lbl" for={`pref-${entry.key}`}>{entry.label}</label>

@@ -50,6 +50,6 @@ async function handleDrop(path: string) {
   // image / other → files.onDropImportable. "Import" embeds images; anything
   // else we can't import, so fall back to inserting a link.
   const action = preferences.get<string>("files.onDropImportable");
-  if (action === "import" && kind === "image") workspace.insertImage(path);
+  if (action === "import" && kind === "image") await workspace.insertImage(path);
   else workspace.insertLink(path);
 }

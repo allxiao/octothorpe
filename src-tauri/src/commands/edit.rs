@@ -1,6 +1,8 @@
 //! Edit-menu commands: Markdown→HTML / plaintext conversions for the "Copy as…"
 //! actions, and copying an image's pixels to the system clipboard.
 
+use std::path::{Path, PathBuf};
+
 use tauri::AppHandle;
 use tauri_plugin_clipboard_manager::ClipboardExt;
 
@@ -49,4 +51,54 @@ pub fn copy_image(src: String, app: AppHandle) -> AppResult<()> {
         .write_image(&img)
         .map_err(|e| AppError::Other(format!("clipboard write failed: {e}")))?;
     Ok(())
+}
+
+/// Pick a non-colliding path in `dir` for `file_name`, appending `-1`, `-2`, … .
+fn dedup_path(dir: &Path, file_name: &str) -> PathBuf {
+    let target = dir.join(file_name);
+    if !target.exists() {
+        return target;
+    }
+    let p = Path::new(file_name);
+    let stem = p.file_stem().and_then(|s| s.to_str()).unwrap_or(file_name);
+    let ext = p.extension().and_then(|s| s.to_str());
+    let mut n = 1;
+    loop {
+        let candidate = match ext {
+            Some(e) => format!("{stem}-{n}.{e}"),
+            None => format!("{stem}-{n}"),
+        };
+        let target = dir.join(candidate);
+        if !target.exists() {
+            return target;
+        }
+        n += 1;
+    }
+}
+
+/// Copy a local image file into `dest_dir` (created if needed), avoiding name
+/// collisions. Returns the absolute path of the copy.
+#[tauri::command]
+pub fn copy_image_into(src: String, dest_dir: String) -> AppResult<String> {
+    let src_path = Path::new(&src);
+    let dir = PathBuf::from(&dest_dir);
+    std::fs::create_dir_all(&dir)?;
+    let file_name = src_path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or_else(|| AppError::Other(format!("invalid image path: {src}")))?;
+    let target = dedup_path(&dir, file_name);
+    std::fs::copy(src_path, &target)?;
+    Ok(target.to_string_lossy().to_string())
+}
+
+/// Write image bytes (e.g. a downloaded online image) into `dest_dir` under
+/// `name` (created if needed), avoiding collisions. Returns the absolute path.
+#[tauri::command]
+pub fn save_image_bytes(dest_dir: String, name: String, bytes: Vec<u8>) -> AppResult<String> {
+    let dir = PathBuf::from(&dest_dir);
+    std::fs::create_dir_all(&dir)?;
+    let target = dedup_path(&dir, &name);
+    std::fs::write(&target, &bytes)?;
+    Ok(target.to_string_lossy().to_string())
 }

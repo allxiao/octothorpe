@@ -28,6 +28,8 @@ export interface PrefEntry {
   inline?: boolean;
   /** Small unit suffix shown after a number input (e.g. "px"). */
   unit?: string;
+  /** Show this row only while another preference equals a value (dependent field). */
+  showWhen?: { key: string; equals: string };
 }
 
 export interface PrefSection {

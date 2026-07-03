@@ -53,6 +53,7 @@ function collectEntries(node, prefix, out) {
         step: ui.step,
         inline: ui.inline,
         unit: ui.unit,
+        showWhen: ui.showWhen,
       });
     }
   }
@@ -87,6 +88,7 @@ for (const catId of categoryOrder) {
     if (leaf.step !== undefined) entry.step = leaf.step;
     if (leaf.inline !== undefined) entry.inline = leaf.inline;
     if (leaf.unit !== undefined) entry.unit = leaf.unit;
+    if (leaf.showWhen !== undefined) entry.showWhen = leaf.showWhen;
     entry.__order = leaf.order;
     section.entries.push(entry);
   }

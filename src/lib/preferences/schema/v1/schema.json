@@ -8,6 +8,7 @@
     "categories": [
       { "id": "files", "label": "Files" },
       { "id": "editor", "label": "Editor" },
+      { "id": "image", "label": "Image" },
       { "id": "appearance", "label": "Appearance" }
     ]
   },
@@ -129,6 +130,80 @@
               { "value": "off", "label": "Off" }
             ]
           }
+        }
+      }
+    },
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "insertAction": {
+          "type": "string",
+          "default": "none",
+          "enum": ["none", "currentFolder", "assets", "filenameAssets", "custom"],
+          "title": "When Insert",
+          "description": "What to do with an image dropped into the editor.",
+          "x-ui": {
+            "category": "image",
+            "section": "When Inserting",
+            "control": "select",
+            "order": 1,
+            "options": [
+              { "value": "none", "label": "No special action" },
+              { "value": "currentFolder", "label": "Copy image to the current folder (./)" },
+              { "value": "assets", "label": "Copy image to ./assets" },
+              { "value": "filenameAssets", "label": "Copy image to ./${filename}.assets" },
+              { "value": "custom", "label": "Copy image to custom folder" }
+            ]
+          }
+        },
+        "customFolder": {
+          "type": "string",
+          "default": "./${filename}.assets",
+          "title": "Custom Folder",
+          "description": "Relative path to the current folder (begins with './' or '../'), or an absolute path. ${filename} stands for the current document's name.",
+          "x-ui": {
+            "category": "image",
+            "section": "When Inserting",
+            "control": "text",
+            "order": 2,
+            "showWhen": { "key": "image.insertAction", "equals": "custom" }
+          }
+        },
+        "applyToLocal": {
+          "type": "boolean",
+          "default": true,
+          "title": "Apply above rules to local images",
+          "description": "Copy images that come from the local filesystem.",
+          "x-ui": { "category": "image", "section": "When Inserting", "control": "toggle", "order": 3 }
+        },
+        "applyToOnline": {
+          "type": "boolean",
+          "default": true,
+          "title": "Apply above rules to online images",
+          "description": "Download and copy images that come from an http(s) URL.",
+          "x-ui": { "category": "image", "section": "When Inserting", "control": "toggle", "order": 4 }
+        },
+        "useRelativePath": {
+          "type": "boolean",
+          "default": true,
+          "title": "Use relative path if possible",
+          "description": "Link to images with a path relative to the document instead of an absolute one.",
+          "x-ui": { "category": "image", "section": "Preferred Image Syntax", "control": "toggle", "order": 1 }
+        },
+        "addDotSlash": {
+          "type": "boolean",
+          "default": false,
+          "title": "Add ./ for relative path",
+          "description": "Prefix relative image paths with \"./\".",
+          "x-ui": { "category": "image", "section": "Preferred Image Syntax", "control": "toggle", "order": 2 }
+        },
+        "autoEscape": {
+          "type": "boolean",
+          "default": false,
+          "title": "Auto escape image URL when insert",
+          "description": "Percent-encode special characters in the inserted image path.",
+          "x-ui": { "category": "image", "section": "Preferred Image Syntax", "control": "toggle", "order": 3 }
         }
       }
     },

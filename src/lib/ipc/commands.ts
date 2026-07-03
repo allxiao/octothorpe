@@ -124,6 +124,13 @@ export const markdownToPlaintext = (markdown: string) =>
 /** Copy a local image file's pixels to the system clipboard. */
 export const copyImage = (src: string) => invoke<void>("copy_image", { src });
 
+/** Copy a local image file into destDir; returns the new absolute path. */
+export const copyImageInto = (src: string, destDir: string) =>
+  invoke<string>("copy_image_into", { src, destDir });
+/** Write image bytes into destDir under name; returns the new absolute path. */
+export const saveImageBytes = (destDir: string, name: string, bytes: number[]) =>
+  invoke<string>("save_image_bytes", { destDir, name, bytes });
+
 // --- Preferences ----------------------------------------------------------
 
 /** Read the raw ~/.octothorpe/preferences.json (or a default when absent). */

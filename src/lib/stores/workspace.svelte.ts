@@ -78,6 +78,36 @@ function fileUrl(path: string): string {
   return "file:///" + encodeURI(fwd);
 }
 
+/** Join a relative path (using `.`/`..`/`/`) onto an absolute base dir, returning
+ *  a normalized absolute path in the base dir's native separator. */
+function joinPath(baseDir: string, rel: string): string {
+  const sep = baseDir.includes("\\") ? "\\" : "/";
+  // Absolute rel (POSIX "/x" or Windows "C:\..") is returned as-is.
+  if (/^([a-zA-Z]:[\\/]|[\\/])/.test(rel)) return rel.replace(/[\\/]/g, sep);
+  const parts = baseDir.replace(/[\\/]+$/, "").split(/[\\/]/);
+  for (const seg of rel.split(/[\\/]/)) {
+    if (seg === "" || seg === ".") continue;
+    if (seg === "..") parts.pop();
+    else parts.push(seg);
+  }
+  return parts.join(sep);
+}
+
+/** POSIX relative path from `fromDir` to `toFile`, or null if not expressible
+ *  (e.g. different Windows drives). */
+function relativePath(fromDir: string, toFile: string): string | null {
+  const norm = (p: string) => p.replace(/\\/g, "/").replace(/\/+$/, "");
+  const from = norm(fromDir).split("/");
+  const to = norm(toFile).split("/");
+  const ci = fromDir.includes("\\"); // case-insensitive on Windows
+  const eq = (a: string, b: string) => (ci ? a.toLowerCase() === b.toLowerCase() : a === b);
+  if (from.length === 0 || to.length === 0 || !eq(from[0], to[0])) return null; // different root/drive
+  let i = 0;
+  while (i < from.length && i < to.length && eq(from[i], to[i])) i++;
+  const up = from.slice(i).map(() => "..");
+  return [...up, ...to.slice(i)].join("/");
+}
+
 /** Rewrite line endings to the configured style (editor.lineEnding). CodeMirror
  *  keeps content as `\n` internally, so this only matters at write time. */
 function normalizeEol(content: string): string {
@@ -567,9 +597,75 @@ class Workspace {
     this.#insertAtCursor(`[${baseName(path)}](${fileUrl(path)})`);
   }
 
-  /** Insert a Markdown image embed for a dropped image at the cursor. */
-  insertImage(path: string) {
-    this.#insertAtCursor(`![${baseName(path)}](${fileUrl(path)})`);
+  /** Insert a Markdown image embed for a dropped image at the cursor, applying
+   *  the image.* preferences (copy into a doc-relative folder, preferred syntax). */
+  async insertImage(src: string) {
+    const online = /^https?:\/\//i.test(src);
+    const baseDir = this.baseDir;
+    const action = preferences.get<string>("image.insertAction");
+    const gate = online
+      ? preferences.get<boolean>("image.applyToOnline")
+      : preferences.get<boolean>("image.applyToLocal");
+
+    let filePath: string | null = null; // absolute path once copied locally
+    if (action !== "none" && gate && baseDir) {
+      const destDir = this.#imageDestDir(action);
+      try {
+        if (online) {
+          const buf = await (await fetch(src)).arrayBuffer();
+          const name = baseName(src.split(/[?#]/)[0]) || "image.png";
+          filePath = await ipc.saveImageBytes(destDir, name, Array.from(new Uint8Array(buf)));
+        } else {
+          filePath = await ipc.copyImageInto(src, destDir);
+        }
+      } catch (e) {
+        this.status = `Image copy failed: ${e}`;
+        filePath = null; // fall back to the original source
+      }
+    }
+
+    const alt = baseName((filePath ?? src).split(/[?#]/)[0]);
+    this.#insertAtCursor(`![${alt}](${this.#imageLink(src, filePath, online, baseDir)})`);
+  }
+
+  /** Resolve the destination directory for a copy action, against the doc folder. */
+  #imageDestDir(action: string): string {
+    const baseDir = this.baseDir;
+    const name = this.activeTitle || "untitled";
+    let rel: string;
+    switch (action) {
+      case "currentFolder":
+        rel = ".";
+        break;
+      case "assets":
+        rel = "./assets";
+        break;
+      case "filenameAssets":
+        rel = `./${name}.assets`;
+        break;
+      default: // custom
+        rel = (preferences.get<string>("image.customFolder") || ".").replace(/\$\{filename\}/g, name);
+    }
+    return joinPath(baseDir, rel);
+  }
+
+  /** Build the image link string honoring the preferred-syntax preferences. */
+  #imageLink(src: string, filePath: string | null, online: boolean, baseDir: string): string {
+    // Not copied: keep the original online URL, else link the local source.
+    const abs = filePath ?? (online ? null : src);
+    if (abs === null) return src; // online, not copied → keep URL as-is
+
+    const esc = (s: string) => (preferences.get<boolean>("image.autoEscape") ? encodeURI(s) : s);
+    if (preferences.get<boolean>("image.useRelativePath") && baseDir) {
+      const rel = relativePath(baseDir, abs);
+      if (rel !== null) {
+        const out = preferences.get<boolean>("image.addDotSlash") && !rel.startsWith("../")
+          ? `./${rel}`
+          : rel;
+        return esc(out);
+      }
+    }
+    return fileUrl(abs);
   }
 
   #insertAtCursor(text: string) {

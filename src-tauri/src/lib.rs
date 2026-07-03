@@ -38,6 +38,8 @@ pub fn run() {
             commands::edit::markdown_to_html,
             commands::edit::markdown_to_plaintext,
             commands::edit::copy_image,
+            commands::edit::copy_image_into,
+            commands::edit::save_image_bytes,
             commands::preferences::read_preferences,
             commands::preferences::write_preferences,
         ])
