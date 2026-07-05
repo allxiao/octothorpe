@@ -4,7 +4,7 @@ import { syntaxTree } from "@codemirror/language";
 import { isElementActive } from "./reveal";
 import { renderHtml } from "./config";
 import { imageBaseDir } from "./config";
-import { HtmlBlockWidget } from "./htmlWidgets";
+import { HtmlBlockWidget, HtmlCommentWidget } from "./htmlWidgets";
 import { VOID_TAGS } from "./inlineHtml";
 
 /**
@@ -46,6 +46,21 @@ function build(state: EditorState): HtmlDecos {
 
   syntaxTree(state).iterate({
     enter: (node) => {
+      // HTML comments / processing instructions → muted collapsed chip (Typora
+      // hides comments from the preview); caret inside leaves the raw source.
+      if (node.name === "CommentBlock" || node.name === "ProcessingInstructionBlock") {
+        const raw = doc.sliceString(node.from, node.to);
+        const complete = node.name === "CommentBlock" ? raw.includes("-->") : raw.includes("?>");
+        if (!complete) return false;
+        if (isElementActive(state, node.from, node.to)) return false;
+        renders.push(
+          Decoration.replace({
+            widget: new HtmlCommentWidget(raw, node.from),
+            block: true,
+          }).range(node.from, node.to),
+        );
+        return false;
+      }
       if (node.name !== "HTMLBlock") return undefined;
       const raw = doc.sliceString(node.from, node.to);
       // Still being typed → leave as raw text.

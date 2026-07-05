@@ -90,3 +90,45 @@ export class HtmlBlockWidget extends WidgetType {
   }
 }
 
+/**
+ * An HTML comment (`<!-- … -->`) or processing instruction, rendered idle as a
+ * muted collapsed chip rather than shown verbatim — Typora hides comments from
+ * the preview. Clicking the chip drops the caret at its start to edit the source.
+ */
+export class HtmlCommentWidget extends WidgetType {
+  constructor(
+    readonly raw: string,
+    readonly enterPos: number,
+  ) {
+    super();
+  }
+  eq(other: HtmlCommentWidget) {
+    return other.raw === this.raw && other.enterPos === this.enterPos;
+  }
+  toDOM(view: EditorView) {
+    const div = document.createElement("div");
+    div.className = "cm-md-html-comment";
+    const inner = this.raw
+      .replace(/^<!--/, "")
+      .replace(/-->$/, "")
+      .replace(/^<\?/, "")
+      .replace(/\?>$/, "")
+      .trim();
+    const label = inner.length > 80 ? inner.slice(0, 80) + "…" : inner || "comment";
+    div.textContent = "❮❯ " + label;
+    div.title = this.raw;
+    div.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      view.dispatch({ selection: { anchor: this.enterPos }, scrollIntoView: true });
+      view.focus();
+    });
+    return div;
+  }
+  ignoreEvent() {
+    return true;
+  }
+  get estimatedHeight() {
+    return 22;
+  }
+}
+

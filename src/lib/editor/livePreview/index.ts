@@ -316,6 +316,23 @@ const livePreviewTheme = EditorView.theme({
     cursor: "pointer",
   },
   ".cm-md-html-block:hover .cm-md-html-badge": { opacity: "0.85" },
+  // HTML comment / PI collapsed to a muted chip (Typora hides comments).
+  ".cm-md-html-comment": {
+    display: "inline-block",
+    padding: "0 0.5em",
+    borderRadius: "5px",
+    background: "var(--code-block-bg, rgba(135, 131, 120, 0.12))",
+    color: "var(--text-muted, #999)",
+    fontFamily: "system-ui, sans-serif",
+    fontSize: "0.8em",
+    fontStyle: "italic",
+    cursor: "text",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    maxWidth: "100%",
+  },
+  ".cm-md-html-comment .cm-widgetBuffer": { display: "none" },
   // Inline math rendered in place of `$…$`.
   ".cm-md-inline-math": { cursor: "text", padding: "0 0.1em" },
   // Live preview tooltip shown below `$…$` while editing it (Typora-style). CM
@@ -556,6 +573,21 @@ const livePreviewTheme = EditorView.theme({
 const interactionHandlers = EditorView.domEventHandlers({
   mousedown(event, view) {
     const target = event.target as HTMLElement | null;
+    // A link inside rendered HTML (a block widget or inline fallback) opens on a
+    // plain click — the surrounding content is non-editable, so there's no caret
+    // gesture to preserve. Internal `#anchor` links jump within the doc.
+    const htmlLink = target?.closest?.(".cm-md-html-block a[href], .cm-html-inline a[href]") as
+      | HTMLAnchorElement
+      | null;
+    if (htmlLink) {
+      const href = htmlLink.getAttribute("href");
+      if (href) {
+        event.preventDefault();
+        if (href.startsWith("#")) jumpToAnchor(view, href.slice(1));
+        else openExternal(href);
+        return true;
+      }
+    }
     // Ctrl/Cmd + click on a link opens it externally; a plain click falls
     // through to normal caret placement (which reveals the source for editing).
     const link = target?.closest?.(".cm-md-link");

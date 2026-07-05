@@ -175,7 +175,7 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
         // `CommentBlock`) by the htmlBlockField StateField, inline HTML
         // (`HTMLTag`) by the inline-HTML pass below. Don't descend into the
         // nested HTML sub-tree the mixed parser mounts here.
-        if (name === "HTMLTag" || name === "HTMLBlock" || name === "CommentBlock") return false;
+        if (name === "HTMLTag" || name === "HTMLBlock" || name === "CommentBlock" || name === "ProcessingInstructionBlock") return false;
 
         // --- Fenced code: render a *terminated* block as a styled box. The code
         //     text stays real (natively highlighted); the fence lines collapse
