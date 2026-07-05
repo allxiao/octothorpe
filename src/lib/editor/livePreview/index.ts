@@ -250,9 +250,12 @@ const livePreviewTheme = EditorView.theme({
   ".cm-md-strike": { textDecoration: "line-through", opacity: "0.7" },
   // Inline math rendered in place of `$…$`.
   ".cm-md-inline-math": { cursor: "text", padding: "0 0.1em" },
-  // Live preview tooltip shown below `$…$` while editing it (Typora-style).
-  ".cm-md-math-tooltip": { padding: "0.25em 0.6em" },
-  ".cm-tooltip:has(.cm-md-math-tooltip)": {
+  // Live preview tooltip shown below `$…$` while editing it (Typora-style). CM
+  // adds the `.cm-tooltip` class to this same element (default z-index 500), so
+  // we drop it below the app's modals (100) — !important beats CM's rule.
+  ".cm-md-math-tooltip": {
+    zIndex: "40 !important",
+    padding: "0.25em 0.6em",
     borderRadius: "6px",
     border: "1px solid var(--border, #ccc)",
     background: "var(--menu-bg, #fff)",
