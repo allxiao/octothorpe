@@ -8,7 +8,7 @@ import {
 import type { Extension } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
 import { buildDecorations } from "./build";
-import { onTagClick, revealSimpleSource, inlineMathRender, inlineMathDisplayStyle } from "./config";
+import { onTagClick, revealSimpleSource, inlineMathRender, inlineMathDisplayStyle, renderHtml } from "./config";
 import { tableField } from "./tableField";
 import { mathField } from "./mathField";
 import { inlineMathTooltipField } from "./mathTooltip";
@@ -120,7 +120,8 @@ class LivePreviewPlugin {
       update.selectionSet ||
       update.startState.facet(revealSimpleSource) !== update.state.facet(revealSimpleSource) ||
       update.startState.facet(inlineMathRender) !== update.state.facet(inlineMathRender) ||
-      update.startState.facet(inlineMathDisplayStyle) !== update.state.facet(inlineMathDisplayStyle)
+      update.startState.facet(inlineMathDisplayStyle) !== update.state.facet(inlineMathDisplayStyle) ||
+      update.startState.facet(renderHtml) !== update.state.facet(renderHtml)
     ) {
       const built = buildDecorations(update.view);
       this.decorations = built.decorations;
@@ -248,6 +249,34 @@ const livePreviewTheme = EditorView.theme({
     color: "#fff",
   },
   ".cm-md-strike": { textDecoration: "line-through", opacity: "0.7" },
+  // Rendered inline HTML tags (Typora-style). Kept inline-editable via mark
+  // decorations; the tag markers are hidden while the caret is outside.
+  ".cm-html-kbd": {
+    fontFamily: "var(--editor-font, monospace)",
+    fontSize: "0.85em",
+    padding: "0.05em 0.4em",
+    border: "1px solid var(--border, #ccc)",
+    borderBottomWidth: "2px",
+    borderRadius: "4px",
+    background: "var(--menu-bg, #fafafa)",
+    whiteSpace: "nowrap",
+  },
+  ".cm-html-mark": { background: "#fef08a", color: "#000", borderRadius: "2px" },
+  ".cm-html-sup": { verticalAlign: "super", fontSize: "0.75em" },
+  ".cm-html-sub": { verticalAlign: "sub", fontSize: "0.75em" },
+  ".cm-html-u": { textDecoration: "underline" },
+  ".cm-html-del": { textDecoration: "line-through", opacity: "0.7" },
+  ".cm-html-b": { fontWeight: "700" },
+  ".cm-html-i": { fontStyle: "italic" },
+  ".cm-html-small": { fontSize: "0.85em" },
+  ".cm-html-code": {
+    fontFamily: "var(--editor-font, monospace)",
+    background: "rgba(135, 131, 120, 0.18)",
+    borderRadius: "3px",
+    padding: "0.1em 0.3em",
+  },
+  ".cm-html-q": { fontStyle: "italic" },
+  ".cm-html-abbr": { textDecoration: "underline dotted", cursor: "help" },
   // Inline math rendered in place of `$…$`.
   ".cm-md-inline-math": { cursor: "text", padding: "0 0.1em" },
   // Live preview tooltip shown below `$…$` while editing it (Typora-style). CM

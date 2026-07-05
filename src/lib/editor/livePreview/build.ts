@@ -2,9 +2,11 @@ import { Decoration, type DecorationSet, type EditorView } from "@codemirror/vie
 import { syntaxTree } from "@codemirror/language";
 import { type Range } from "@codemirror/state";
 import { isElementActive, isLineActive } from "./reveal";
-import { imageBaseDir, revealSimpleSource, inlineMathRender, inlineMathDisplayStyle } from "./config";
+import { imageBaseDir, revealSimpleSource, inlineMathRender, inlineMathDisplayStyle, renderHtml } from "./config";
 import { scanTagsInLine } from "./tagScan";
 import { resolveHtmlSrc } from "../html/paths";
+import { collectInlineHtml } from "./inlineHtml";
+import { mathBlockRanges } from "./mathField";
 import {
   ImageWidget,
   HrWidget,
@@ -103,6 +105,18 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
   const linkRanges: { from: number; to: number }[] = [];
   const inLink = (pos: number) => linkRanges.some((r) => pos >= r.from && pos < r.to);
 
+  // Inline-HTML tag ranges, so the tag scan doesn't turn e.g. the `#fff` in
+  // `<span style="color:#fff">` into a tag pill. Filled by the inline-HTML pass.
+  const htmlTagRanges: { from: number; to: number }[] = [];
+  const inHtml = (pos: number) => htmlTagRanges.some((r) => pos >= r.from && pos < r.to);
+
+  // Whether embedded HTML renders (markdown.renderHtml). When off, HTML stays as
+  // literal source text.
+  const htmlOn = state.facet(renderHtml);
+  // Math blocks rendered idle (by mathField) — the inline-HTML pass skips them.
+  const mathBlocks = mathBlockRanges(state);
+  const inMathBlock = (pos: number) => mathBlocks.some((r) => pos >= r.from && pos < r.to);
+
   // Render a link reference definition line (`[id]: url "title"`): dim the
   // `[id]:` label, show the URL as a clickable link, and dim the title. Empty
   // URL/title slots get a placeholder that disappears once real text is typed
@@ -150,6 +164,12 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
       enter: (node) => {
         if (inTable(node.from)) return false;
         const name = node.name;
+
+        // Embedded HTML is handled separately: block HTML (`HTMLBlock`,
+        // `CommentBlock`) by the htmlBlockField StateField, inline HTML
+        // (`HTMLTag`) by the inline-HTML pass below. Don't descend into the
+        // nested HTML sub-tree the mixed parser mounts here.
+        if (name === "HTMLTag" || name === "HTMLBlock" || name === "CommentBlock") return false;
 
         // --- Fenced code: render a *terminated* block as a styled box. The code
         //     text stays real (natively highlighted); the fence lines collapse
@@ -494,6 +514,25 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
       },
     });
 
+    // Inline HTML (`<kbd>`, `<sup>`, `<span style>`, …): pair tags and render
+    // the class-expressible ones in place. Runs before the tag scan so the tag
+    // ranges it records suppress spurious `#…` pills inside HTML attributes.
+    if (htmlOn) {
+      const skipHtml = (pos: number) =>
+        inCode(pos) || inTable(pos) || inLink(pos) || inMathBlock(pos);
+      const res = collectInlineHtml(state, from, to, skipHtml);
+      for (const r of res.tagRanges) htmlTagRanges.push(r);
+      for (const op of res.ops) {
+        if (op.kind === "hide") {
+          hide(op.from, op.to);
+        } else {
+          decos.push(
+            Decoration.mark({ class: op.class, attributes: op.attributes }).range(op.from, op.to),
+          );
+        }
+      }
+    }
+
     // Bear-style tag pills: a viewport-only plain-text scan (the Lezer parser
     // doesn't model tags). Mark each `#tag` with a clickable pill class.
     let ln = state.doc.lineAt(from).number;
@@ -511,6 +550,7 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
       }
       for (const t of scanTagsInLine(line.text)) {
         if (inLink(line.from + t.start)) continue; // `#anchor` inside a link
+        if (inHtml(line.from + t.start)) continue; // `#fff` inside an HTML attribute
         decos.push(
           Decoration.mark({
             class: "cm-md-tag",

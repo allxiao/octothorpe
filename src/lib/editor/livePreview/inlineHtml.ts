@@ -1,0 +1,238 @@
+import type { EditorState } from "@codemirror/state";
+import { syntaxTree } from "@codemirror/language";
+import { isElementActive } from "./reveal";
+
+/**
+ * Inline HTML rendering (Typora-style). `@lezer/markdown` emits one `HTMLTag`
+ * node per tag, so `<kbd>Ctrl</kbd>` is three siblings: `<kbd>`, the text, and
+ * `</kbd>`. We pair opening/closing tags with a stack and, for tags a CSS class
+ * can express, hide the tags and mark the inner text — which keeps the content
+ * inline-editable and lets nested Markdown (e.g. `<mark>**bold**</mark>`) keep
+ * rendering through the normal pass. Tags a class can't express, plus void tags
+ * (`<br>`, `<img>`), are handled by the widget fallback (see `inlineHtmlWidgets`).
+ *
+ * As with emphasis/inline-math, an element reveals its raw source while the caret
+ * is inside it (`isElementActive`).
+ */
+
+/** Tags renderable purely with a CSS class (kept inline-editable). */
+const MARK_CLASS: Record<string, string> = {
+  kbd: "cm-html-kbd",
+  mark: "cm-html-mark",
+  sup: "cm-html-sup",
+  sub: "cm-html-sub",
+  u: "cm-html-u",
+  ins: "cm-html-u",
+  s: "cm-html-del",
+  del: "cm-html-del",
+  strike: "cm-html-del",
+  b: "cm-html-b",
+  strong: "cm-html-b",
+  i: "cm-html-i",
+  em: "cm-html-i",
+  cite: "cm-html-i",
+  var: "cm-html-i",
+  dfn: "cm-html-i",
+  small: "cm-html-small",
+  code: "cm-html-code",
+  samp: "cm-html-code",
+  q: "cm-html-q",
+  abbr: "cm-html-abbr",
+  span: "cm-html-span",
+};
+
+/** Elements that never have a closing tag; they stand alone (handled in M4). */
+export const VOID_TAGS = new Set([
+  "br",
+  "hr",
+  "img",
+  "wbr",
+  "input",
+  "area",
+  "col",
+  "embed",
+  "source",
+  "track",
+  "param",
+  "base",
+  "meta",
+  "link",
+]);
+
+/** CSS properties allowed on an inline `<span style="…">`; the rest are dropped
+ *  so a `style` attribute can't escape into layout/positioning tricks. */
+const STYLE_PROPS = new Set([
+  "color",
+  "background",
+  "background-color",
+  "font-weight",
+  "font-style",
+  "font-size",
+  "font-family",
+  "text-decoration",
+  "text-transform",
+  "letter-spacing",
+  "vertical-align",
+  "opacity",
+]);
+
+/** Keep only allowlisted, value-safe declarations from a raw `style` string. */
+function safeStyle(raw: string): string | undefined {
+  const out: string[] = [];
+  for (const decl of raw.split(";")) {
+    const i = decl.indexOf(":");
+    if (i < 0) continue;
+    const prop = decl.slice(0, i).trim().toLowerCase();
+    const val = decl.slice(i + 1).trim();
+    if (!prop || !val || !STYLE_PROPS.has(prop)) continue;
+    if (/url\(|expression|javascript:|<|@import/i.test(val)) continue;
+    out.push(`${prop}:${val}`);
+  }
+  return out.length ? out.join(";") : undefined;
+}
+
+/** Read an attribute value from a raw opening tag (`<span style="…" title='…'>`). */
+function attr(rawTag: string, name: string): string | undefined {
+  const m = new RegExp(`\\b${name}\\s*=\\s*("([^"]*)"|'([^']*)'|([^\\s"'>]+))`, "i").exec(rawTag);
+  if (!m) return undefined;
+  return m[2] ?? m[3] ?? m[4];
+}
+
+interface ParsedTag {
+  name: string;
+  kind: "open" | "close" | "void";
+  raw: string;
+}
+
+/** Classify a single `HTMLTag` slice. Returns null if it isn't a simple tag. */
+function parseTag(raw: string): ParsedTag | null {
+  let m = /^<\/([a-zA-Z][\w:-]*)\s*>$/.exec(raw);
+  if (m) return { name: m[1].toLowerCase(), kind: "close", raw };
+  m = /^<([a-zA-Z][\w:-]*)(?:\s[^>]*?)?\/>$/.exec(raw);
+  if (m) return { name: m[1].toLowerCase(), kind: "void", raw };
+  m = /^<([a-zA-Z][\w:-]*)(?:\s[^>]*)?>$/.exec(raw);
+  if (m) {
+    const name = m[1].toLowerCase();
+    return { name, kind: VOID_TAGS.has(name) ? "void" : "open", raw };
+  }
+  return null;
+}
+
+export interface HtmlTagInfo extends ParsedTag {
+  from: number;
+  to: number;
+}
+
+/** A decoration to apply for a rendered inline-HTML pair. */
+export type InlineHtmlOp =
+  | { kind: "hide"; from: number; to: number }
+  | { kind: "mark"; from: number; to: number; class: string; attributes?: Record<string, string> };
+
+export interface InlineHtmlResult {
+  ops: InlineHtmlOp[];
+  /** Every `HTMLTag` node range in the scanned window (for the tag-pill scan to
+   *  skip — a `<span style="#fff">` must not spawn a `#fff` pill). */
+  tagRanges: { from: number; to: number }[];
+  /** Void/unmatched/non-mark tags left for the widget fallback (M4). */
+  leftover: HtmlTagInfo[];
+}
+
+/**
+ * Collect inline-HTML decorations over `[from, to)`. `skip(pos)` excludes tags
+ * inside code/tables/math/links where a `<` is literal or already handled.
+ */
+export function collectInlineHtml(
+  state: EditorState,
+  from: number,
+  to: number,
+  skip: (pos: number) => boolean,
+): InlineHtmlResult {
+  const ops: InlineHtmlOp[] = [];
+  const tagRanges: { from: number; to: number }[] = [];
+  const leftover: HtmlTagInfo[] = [];
+
+  // Gather HTMLTag nodes in document order.
+  const tags: HtmlTagInfo[] = [];
+  syntaxTree(state).iterate({
+    from,
+    to,
+    enter: (node) => {
+      if (node.name !== "HTMLTag") return undefined;
+      if (skip(node.from)) return false;
+      const parsed = parseTag(state.doc.sliceString(node.from, node.to));
+      tagRanges.push({ from: node.from, to: node.to });
+      if (parsed) tags.push({ ...parsed, from: node.from, to: node.to });
+      return false; // don't descend into the nested HTML tree
+    },
+  });
+
+  // Pair opens with closes via a stack; unmatched tags become leftovers.
+  const stack: HtmlTagInfo[] = [];
+  const matched = new Set<HtmlTagInfo>();
+  for (const tag of tags) {
+    if (tag.kind === "void") {
+      leftover.push(tag);
+      continue;
+    }
+    if (tag.kind === "open") {
+      stack.push(tag);
+      continue;
+    }
+    // close: find the nearest matching open on the stack.
+    let idx = -1;
+    for (let k = stack.length - 1; k >= 0; k--) {
+      if (stack[k].name === tag.name) {
+        idx = k;
+        break;
+      }
+    }
+    if (idx < 0) {
+      leftover.push(tag);
+      continue;
+    }
+    const open = stack[idx];
+    // Anything left unmatched above the match is a stray open → leftover.
+    for (let k = stack.length - 1; k > idx; k--) leftover.push(stack[k]);
+    stack.length = idx;
+
+    const cls = MARK_CLASS[open.name];
+    if (!cls) {
+      // Not class-expressible → widget fallback (M4).
+      leftover.push(open, tag);
+      matched.add(open);
+      matched.add(tag);
+      continue;
+    }
+    matched.add(open);
+    matched.add(tag);
+
+    // Editing this element → leave the raw source visible.
+    if (isElementActive(state, open.from, tag.to)) continue;
+
+    ops.push({ kind: "hide", from: open.from, to: open.to });
+    ops.push({ kind: "hide", from: tag.from, to: tag.to });
+    const innerFrom = open.to;
+    const innerTo = tag.from;
+    if (innerFrom < innerTo) {
+      const attributes: Record<string, string> = {};
+      if (open.name === "span") {
+        const style = attr(open.raw, "style");
+        const safe = style ? safeStyle(style) : undefined;
+        if (safe) attributes.style = safe;
+      }
+      const title = attr(open.raw, "title");
+      if (title) attributes.title = title;
+      ops.push({
+        kind: "mark",
+        from: innerFrom,
+        to: innerTo,
+        class: cls,
+        attributes: Object.keys(attributes).length ? attributes : undefined,
+      });
+    }
+  }
+  // Stray opens never closed → leftovers.
+  for (const open of stack) if (!matched.has(open)) leftover.push(open);
+
+  return { ops, tagRanges, leftover };
+}
