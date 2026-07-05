@@ -6,6 +6,7 @@ import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirro
 import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from "@codemirror/language";
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
 import { markdownLang } from "./markdownLang";
+import { htmlTagComplete } from "./htmlComplete";
 import { COMMANDS } from "./commands";
 import { autoTable, enterTableUp, enterTableDown } from "./commands/table";
 import { autoCodeFence, autoMathBlock, autoHtmlBlock, codeFenceBackspace, codeLangDown, codeLangRight, mathBlockDown, mathBlockUp, htmlBlockDown, htmlBlockUp, MATH_FENCE_RE } from "./commands/block";
@@ -155,6 +156,7 @@ export function baseExtensions(onSave?: () => void): Extension[] {
     markdownLang(),
     ensureLineAfterTrailingBlock,
     autoQuoteRefTitle,
+    htmlTagComplete,
     keymap.of([
       {
         key: "Mod-s",

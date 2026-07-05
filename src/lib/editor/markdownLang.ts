@@ -1,4 +1,5 @@
 import { markdown } from "@codemirror/lang-markdown";
+import { html } from "@codemirror/lang-html";
 import { languages } from "@codemirror/language-data";
 import { GFM } from "@lezer/markdown";
 import { mathMarkdown } from "./math/mathMarkdown";
@@ -16,5 +17,9 @@ export function markdownLang() {
   return markdown({
     codeLanguages: languages,
     extensions: [GFM, mathMarkdown],
+    // Disable lang-html's built-in `>` tag auto-close: our htmlComplete handler
+    // owns tag completion (Markdown `</` closing, and the pretty 3-line block
+    // form inside HTML code contexts), so the two must not both fire on `>`.
+    htmlTagLanguage: html({ matchClosingTags: false, autoCloseTags: false }),
   });
 }
