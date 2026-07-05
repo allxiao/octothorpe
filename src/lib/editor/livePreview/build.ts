@@ -7,9 +7,9 @@ import { scanTagsInLine } from "./tagScan";
 import { resolveHtmlSrc } from "../html/paths";
 import { sanitizeHtml } from "../html/render";
 import { collectInlineHtml } from "./inlineHtml";
-import { InlineHtmlWidget } from "./htmlWidgets";
+import { InlineHtmlWidget, HtmlBadgeWidget } from "./htmlWidgets";
 import { mathBlockRanges } from "./mathField";
-import { htmlBlockRanges } from "./htmlBlockField";
+import { htmlBlockRanges, htmlTagBlockRegions } from "./htmlBlockField";
 import {
   ImageWidget,
   HrWidget,
@@ -122,6 +122,10 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
   // Block-HTML rendered idle (by htmlBlockField) — the tag scan / inline pass skip.
   const htmlBlocks = htmlBlockRanges(state);
   const inHtmlBlock = (pos: number) => htmlBlocks.some((r) => pos >= r.from && pos < r.to);
+  // Multi-line block-HTML regions (open→close tag lines). Used both to skip inline
+  // rendering of their inner tags and to box them while editing (below).
+  const htmlRegions = htmlOn ? htmlTagBlockRegions(state) : [];
+  const inHtmlRegion = (pos: number) => htmlRegions.some((r) => pos >= r.from && pos < r.to);
 
   // Render a link reference definition line (`[id]: url "title"`): dim the
   // `[id]:` label, show the URL as a clickable link, and dim the title. Empty
@@ -174,7 +178,8 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
         // Embedded HTML is handled separately: block HTML (`HTMLBlock`,
         // `CommentBlock`) by the htmlBlockField StateField, inline HTML
         // (`HTMLTag`) by the inline-HTML pass below. Don't descend into the
-        // nested HTML sub-tree the mixed parser mounts here.
+        // nested HTML sub-tree the mixed parser mounts here. Editing a block is
+        // boxed by the region pass after this loop.
         if (name === "HTMLTag" || name === "HTMLBlock" || name === "CommentBlock" || name === "ProcessingInstructionBlock") return false;
 
         // --- Fenced code: render a *terminated* block as a styled box. The code
@@ -525,7 +530,7 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
     // ranges it records suppress spurious `#…` pills inside HTML attributes.
     if (htmlOn) {
       const skipHtml = (pos: number) =>
-        inCode(pos) || inTable(pos) || inLink(pos) || inMathBlock(pos) || inHtmlBlock(pos);
+        inCode(pos) || inTable(pos) || inLink(pos) || inMathBlock(pos) || inHtmlBlock(pos) || inHtmlRegion(pos);
       const res = collectInlineHtml(state, from, to, skipHtml);
       for (const r of res.tagRanges) htmlTagRanges.push(r);
       for (const op of res.ops) {
@@ -554,7 +559,7 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
     const lastLn = state.doc.lineAt(to).number;
     for (; ln <= lastLn; ln++) {
       const line = state.doc.line(ln);
-      if (inTable(line.from) || inCode(line.from) || inHtmlBlock(line.from)) continue;
+      if (inTable(line.from) || inCode(line.from) || inHtmlBlock(line.from) || inHtmlRegion(line.from)) continue;
       // Link reference definition line — styled, with placeholders for empty
       // URL/title. (Handled here, not in the tree walk, because an empty
       // `[id]:` isn't a LinkReference node.) Such lines carry no tags.
@@ -573,6 +578,28 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
           }).range(line.from + t.start, line.from + t.end),
         );
       }
+    }
+  }
+
+  // Box each multi-line block-HTML region the caret is editing, like a math-block
+  // edit area: the `<tag>`/`</tag>` show on the first/last lines and an "HTML"
+  // badge marks the top-right. Idle regions are rendered by htmlBlockField. Done
+  // once (regions are whole-doc), after the viewport passes.
+  if (htmlOn) {
+    for (const r of htmlRegions) {
+      if (!isElementActive(state, r.from, r.to)) continue;
+      const startLine = state.doc.lineAt(r.from);
+      const endLine = state.doc.lineAt(r.to);
+      for (let ln = startLine.number; ln <= endLine.number; ln++) {
+        const l = state.doc.line(ln);
+        let cls = "cm-md-code-block";
+        if (ln === startLine.number) cls += " cm-md-code-top cm-md-html-edit-top";
+        if (ln === endLine.number) cls += " cm-md-code-bottom";
+        lineClass(l.from, cls);
+      }
+      decos.push(
+        Decoration.widget({ widget: new HtmlBadgeWidget(), side: 1 }).range(startLine.from),
+      );
     }
   }
 

@@ -28,7 +28,7 @@ const EMPTY: HtmlDecos = { set: Decoration.none };
  * half-typed. A void/self-closing root is complete immediately; anything else
  * needs its matching close tag. Comments/PIs are handled elsewhere.
  */
-function isComplete(raw: string): boolean {
+export function isHtmlBlockComplete(raw: string): boolean {
   const s = raw.trim();
   const m = /^<([a-zA-Z][\w-]*)/.exec(s);
   if (!m) return true; // doctype or other self-contained markup
@@ -38,11 +38,69 @@ function isComplete(raw: string): boolean {
   return new RegExp(`</${tag}\\s*>`, "i").test(s);
 }
 
+const OPEN_TAG_LINE = /^(\s*)<([a-zA-Z][\w-]*)(?:\s[^>]*)?>\s*$/;
+const CLOSE_TAG_LINE = /^\s*<\/([a-zA-Z][\w-]*)>\s*$/;
+
+/**
+ * Top-level multi-line block regions: an opening `<tag>` alone on its line paired
+ * with its matching closing `</tag>` alone on a later line. These deliberately
+ * span blank body lines — CommonMark ends a type-6 HTML block at a blank line, so
+ * `<div>\n\n</div>` would otherwise parse as *two* HTML blocks. Treating the
+ * open→close span as one region lets us render it as a single block and box it as
+ * one unit while editing (Typora-style), regardless of blank lines inside.
+ */
+export function htmlTagBlockRegions(state: EditorState): { from: number; to: number }[] {
+  const doc = state.doc;
+  const out: { from: number; to: number }[] = [];
+  const stack: { tag: string; from: number }[] = [];
+  for (let n = 1; n <= doc.lines; n++) {
+    const line = doc.line(n);
+    const close = CLOSE_TAG_LINE.exec(line.text);
+    if (close) {
+      const tag = close[1].toLowerCase();
+      for (let k = stack.length - 1; k >= 0; k--) {
+        if (stack[k].tag === tag) {
+          const region = { from: stack[k].from, to: line.to };
+          stack.length = k;
+          if (stack.length === 0) out.push(region); // top-level only
+          break;
+        }
+      }
+      continue;
+    }
+    const open = OPEN_TAG_LINE.exec(line.text);
+    if (open) {
+      const tag = open[2].toLowerCase();
+      if (!VOID_TAGS.has(tag) && !/\/>\s*$/.test(line.text.trim())) {
+        stack.push({ tag, from: line.from });
+      }
+    }
+  }
+  return out;
+}
+
 function build(state: EditorState): HtmlDecos {
   if (!state.facet(renderHtml)) return EMPTY;
   const doc = state.doc;
   const baseDir = state.facet(imageBaseDir);
   const renders: Range<Decoration>[] = [];
+
+  // Structural multi-line regions first: render idle ones as a single widget,
+  // and remember every region's span (rendered or being edited) so the parser
+  // HTMLBlock pass below skips the sub-blocks a blank line may have split them
+  // into.
+  const regions = htmlTagBlockRegions(state);
+  const covered = (from: number, to: number) =>
+    regions.some((r) => from >= r.from && to <= r.to);
+  for (const r of regions) {
+    if (isElementActive(state, r.from, r.to)) continue; // editing → boxed by build.ts
+    renders.push(
+      Decoration.replace({
+        widget: new HtmlBlockWidget(doc.sliceString(r.from, r.to), baseDir),
+        block: true,
+      }).range(r.from, r.to),
+    );
+  }
 
   syntaxTree(state).iterate({
     enter: (node) => {
@@ -62,9 +120,11 @@ function build(state: EditorState): HtmlDecos {
         return false;
       }
       if (node.name !== "HTMLBlock") return undefined;
+      // Part of a multi-line region (possibly split by a blank line) → handled above.
+      if (covered(node.from, node.to)) return false;
       const raw = doc.sliceString(node.from, node.to);
       // Still being typed → leave as raw text.
-      if (!isComplete(raw)) return false;
+      if (!isHtmlBlockComplete(raw)) return false;
       // Caret inside → editing: keep the raw source visible.
       if (isElementActive(state, node.from, node.to)) return false;
       renders.push(

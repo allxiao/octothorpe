@@ -2,10 +2,12 @@
 // TOC/front-matter/link-reference/footnote/paragraph blocks.
 
 import type { EditorView } from "@codemirror/view";
+import { indentUnit } from "@codemirror/language";
 import { insertText, mapLines, markerGap, selectedLines } from "./util";
 import { detectFence, FENCE_RE } from "./code";
 import { mathBlockRanges } from "../livePreview/mathField";
 import { htmlBlockRanges } from "../livePreview/htmlBlockField";
+import { VOID_TAGS } from "../livePreview/inlineHtml";
 
 const QUOTE_RE = /^(\s*)>\s?/;
 
@@ -192,6 +194,51 @@ export function autoCodeFence(view: EditorView): boolean {
   // after it so the caret can still leave the block downward.
   const insert = "\n" + indent + "\n" + indent + fence;
   const anchor = line.to + 1 + indent.length; // start of the blank middle line
+  view.dispatch({ changes: { from: line.to, insert }, selection: { anchor }, scrollIntoView: true });
+  view.focus();
+  return true;
+}
+
+/** A line that is exactly a single opening HTML tag (after any indentation). */
+const OPEN_HTML_TAG_RE = /^(\s*)<([a-zA-Z][\w-]*)(?:\s[^>]*)?>\s*$/;
+
+/**
+ * Pressing Enter at the end of a just-typed opening block tag (`<div>`,
+ * `<details>`, …) auto-completes it Typora-style: an indented blank body line
+ * (caret lands here) and a matching closing tag below —
+ *
+ *     <div>
+ *         |
+ *     </div>
+ *
+ * Void tags (`<br>`, `<img>`) and self-closing tags don't close; a tag already
+ * closed just below falls through to the default newline. Returns false when the
+ * line isn't a lone opening tag.
+ */
+export function autoHtmlBlock(view: EditorView): boolean {
+  const { state } = view;
+  const sel = state.selection.main;
+  if (!sel.empty) return false;
+  const line = state.doc.lineAt(sel.head);
+  if (sel.head !== line.to) return false; // only at end of line
+  const m = OPEN_HTML_TAG_RE.exec(line.text);
+  if (!m) return false;
+  const tag = m[2].toLowerCase();
+  if (VOID_TAGS.has(tag)) return false; // <br>, <img>, <hr>, … never close
+  const close = "</" + tag + ">";
+  // Already closed by a matching tag just below? → default newline (editing an
+  // existing block rather than opening a fresh one).
+  for (let n = line.number + 1; n <= state.doc.lines; n++) {
+    const t = state.doc.line(n).text.trim();
+    if (t === close) return false;
+    if (t !== "") break; // stop at the first non-blank line
+  }
+  const indent = m[1];
+  const body = indent + state.facet(indentUnit);
+  // The closing tag lands at EOF here; a transaction filter guarantees a line
+  // after it so the caret can still leave the block downward.
+  const insert = "\n" + body + "\n" + indent + close;
+  const anchor = line.to + 1 + body.length; // caret on the indented body line
   view.dispatch({ changes: { from: line.to, insert }, selection: { anchor }, scrollIntoView: true });
   view.focus();
   return true;

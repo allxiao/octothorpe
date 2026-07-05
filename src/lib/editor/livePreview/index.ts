@@ -316,6 +316,24 @@ const livePreviewTheme = EditorView.theme({
     cursor: "pointer",
   },
   ".cm-md-html-block:hover .cm-md-html-badge": { opacity: "0.85" },
+  // Editing a block-HTML region: the block's lines are boxed (reusing the code
+  // box classes); this positions the top-right "HTML" badge on the first line.
+  ".cm-md-html-edit-top": { position: "relative" },
+  ".cm-md-html-edit-badge": {
+    position: "absolute",
+    top: "3px",
+    right: "6px",
+    padding: "0 6px",
+    fontSize: "11px",
+    lineHeight: "16px",
+    fontFamily: "system-ui, sans-serif",
+    color: "var(--text, #555)",
+    background: "var(--menu-bg, #fff)",
+    border: "1px solid var(--border, #ccc)",
+    borderRadius: "5px",
+    opacity: "0.6",
+    pointerEvents: "none",
+  },
   // HTML comment / PI collapsed to a muted chip (Typora hides comments).
   ".cm-md-html-comment": {
     display: "inline-block",
