@@ -29,6 +29,7 @@
     "@tauri-apps/plugin-dialog": "^2",
     "ajv": "^8.17.1",
     "codemirror": "^6.0.1",
+    "dompurify": "^3.4.11",
     "katex": "^0.17.0"
   },
   "devDependencies": {

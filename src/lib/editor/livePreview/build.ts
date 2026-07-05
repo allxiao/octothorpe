@@ -1,10 +1,10 @@
 import { Decoration, type DecorationSet, type EditorView } from "@codemirror/view";
 import { syntaxTree } from "@codemirror/language";
 import { type Range } from "@codemirror/state";
-import { convertFileSrc } from "@tauri-apps/api/core";
 import { isElementActive, isLineActive } from "./reveal";
 import { imageBaseDir, revealSimpleSource, inlineMathRender, inlineMathDisplayStyle } from "./config";
 import { scanTagsInLine } from "./tagScan";
+import { resolveHtmlSrc } from "../html/paths";
 import {
   ImageWidget,
   HrWidget,
@@ -18,23 +18,10 @@ import { tableRanges } from "./tableField";
 import { resolveLinkRef } from "./linkRefs";
 
 /**
- * Resolve a Markdown image URL to something the webview can load. Remote and
- * data URLs pass through; relative/local paths are resolved against the open
- * document's directory and routed through Tauri's asset protocol. Returns null
- * when it can't be resolved (e.g. a local path outside a Tauri context).
+ * Resolve a Markdown image URL to something the webview can load. Shared with the
+ * embedded-HTML renderer so `![](…)` images and `<img src="…">` behave the same.
  */
-function resolveImageSrc(url: string, baseDir: string): string | null {
-  if (/^(https?:|data:)/.test(url)) return url;
-  try {
-    if (/^file:/i.test(url)) return convertFileSrc(decodeURI(url.replace(/^file:\/*/i, "")));
-    if (!baseDir) return null;
-    const sep = baseDir.includes("\\") ? "\\" : "/";
-    const joined = baseDir.replace(/[\\/]+$/, "") + sep + url.replace(/\//g, sep);
-    return convertFileSrc(joined);
-  } catch {
-    return null;
-  }
-}
+const resolveImageSrc = resolveHtmlSrc;
 
 /**
  * Resolve a Markdown image URL to a filesystem path (for reading its bytes, e.g.
