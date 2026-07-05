@@ -11,6 +11,7 @@ import { buildDecorations } from "./build";
 import { onTagClick, revealSimpleSource, inlineMathRender, inlineMathDisplayStyle, renderHtml } from "./config";
 import { tableField } from "./tableField";
 import { mathField } from "./mathField";
+import { htmlBlockField } from "./htmlBlockField";
 import { inlineMathTooltipField } from "./mathTooltip";
 import { linkRefsField } from "./linkRefs";
 import { clearActiveTable } from "./TableWidget";
@@ -280,6 +281,41 @@ const livePreviewTheme = EditorView.theme({
   // Fallback inline-HTML widget (void tags like <br>, and tags a class can't
   // express like <ruby>): the sanitized HTML rendered in an editable-on-click span.
   ".cm-html-inline": { cursor: "text" },
+  // Idle block-HTML render (caret outside a <details>/<table>/<svg>/media/iframe
+  // block). Interactive body; a hover "HTML" badge is the click-to-edit handle.
+  // NOTE: padding, never margin — CM measures widget height excluding margins, so
+  // a margin here desyncs the height map and offsets clicks/cursor below.
+  ".cm-md-html-block": {
+    position: "relative",
+    padding: "0.3em 0",
+    overflowX: "auto",
+  },
+  ".cm-md-html-block img, .cm-md-html-block video, .cm-md-html-block svg": {
+    maxWidth: "100%",
+  },
+  ".cm-md-html-block iframe": { maxWidth: "100%", border: "0" },
+  ".cm-md-html-block table": { borderCollapse: "collapse" },
+  ".cm-md-html-block th, .cm-md-html-block td": {
+    border: "1px solid var(--border, #ccc)",
+    padding: "4px 9px",
+  },
+  ".cm-md-html-badge": {
+    position: "absolute",
+    top: "2px",
+    right: "4px",
+    padding: "0 6px",
+    fontSize: "11px",
+    lineHeight: "16px",
+    fontFamily: "system-ui, sans-serif",
+    color: "var(--text, #555)",
+    background: "var(--menu-bg, #fff)",
+    border: "1px solid var(--border, #ccc)",
+    borderRadius: "5px",
+    opacity: "0",
+    transition: "opacity 0.1s",
+    cursor: "pointer",
+  },
+  ".cm-md-html-block:hover .cm-md-html-badge": { opacity: "0.85" },
   // Inline math rendered in place of `$…$`.
   ".cm-md-inline-math": { cursor: "text", padding: "0 0.1em" },
   // Live preview tooltip shown below `$…$` while editing it (Typora-style). CM
@@ -592,6 +628,7 @@ export function livePreview(): Extension {
     linkRefsField,
     tableField,
     mathField,
+    htmlBlockField,
     inlineMathTooltipField,
     livePreviewPlugin,
     livePreviewTheme,

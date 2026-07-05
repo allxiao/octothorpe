@@ -76,25 +76,6 @@ const BLOCK_CONFIG: Config = {
   ],
 };
 
-// Inline context: never allow block/embedding tags to render inline. Keep the
-// default allowlist but forbid the block-only structures so a stray `<div>` or
-// `<iframe>` written mid-sentence stays as source rather than breaking the line.
-const INLINE_CONFIG: Config = {
-  ...COMMON,
-  FORBID_TAGS: [
-    ...(COMMON.FORBID_TAGS as string[]),
-    "div",
-    "p",
-    "iframe",
-    "video",
-    "audio",
-    "table",
-    "details",
-    "summary",
-    "svg",
-  ],
-};
-
 let hookInstalled = false;
 function installHook() {
   if (hookInstalled || !hasDOM) return;
@@ -148,7 +129,6 @@ function installHook() {
 // keeps the map bounded, matching the KaTeX render cache.
 const MAX_CACHE = 500;
 const blockCache = new Map<string, string>();
-const inlineCache = new Map<string, string>();
 
 function cachePut(cache: Map<string, string>, key: string, value: string) {
   if (cache.size >= MAX_CACHE) {
@@ -167,23 +147,15 @@ function run(raw: string, baseDir: string, config: Config): string {
   return out;
 }
 
-/** Sanitize block-level HTML (allows media + sandboxed iframes). Memoized. */
+/** Sanitize embedded HTML (allows media + sandboxed iframes, drops scripts/
+ *  handlers/`javascript:`/`id`/`class`/`data-*`). Used for both block widgets and
+ *  the inline widget fallback. Memoized by base dir + raw source. */
 export function sanitizeHtml(raw: string, baseDir: string): string {
   const key = baseDir + "\0" + raw;
   const cached = blockCache.get(key);
   if (cached !== undefined) return cached;
   const out = run(raw, baseDir, BLOCK_CONFIG);
   cachePut(blockCache, key, out);
-  return out;
-}
-
-/** Sanitize inline HTML (block/embedding tags are refused). Memoized. */
-export function sanitizeInlineHtml(raw: string, baseDir: string): string {
-  const key = baseDir + "\0" + raw;
-  const cached = inlineCache.get(key);
-  if (cached !== undefined) return cached;
-  const out = run(raw, baseDir, INLINE_CONFIG);
-  cachePut(inlineCache, key, out);
   return out;
 }
 

@@ -5,10 +5,11 @@ import { isElementActive, isLineActive } from "./reveal";
 import { imageBaseDir, revealSimpleSource, inlineMathRender, inlineMathDisplayStyle, renderHtml } from "./config";
 import { scanTagsInLine } from "./tagScan";
 import { resolveHtmlSrc } from "../html/paths";
-import { sanitizeInlineHtml } from "../html/render";
+import { sanitizeHtml } from "../html/render";
 import { collectInlineHtml } from "./inlineHtml";
 import { InlineHtmlWidget } from "./htmlWidgets";
 import { mathBlockRanges } from "./mathField";
+import { htmlBlockRanges } from "./htmlBlockField";
 import {
   ImageWidget,
   HrWidget,
@@ -118,6 +119,9 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
   // Math blocks rendered idle (by mathField) — the inline-HTML pass skips them.
   const mathBlocks = mathBlockRanges(state);
   const inMathBlock = (pos: number) => mathBlocks.some((r) => pos >= r.from && pos < r.to);
+  // Block-HTML rendered idle (by htmlBlockField) — the tag scan / inline pass skip.
+  const htmlBlocks = htmlBlockRanges(state);
+  const inHtmlBlock = (pos: number) => htmlBlocks.some((r) => pos >= r.from && pos < r.to);
 
   // Render a link reference definition line (`[id]: url "title"`): dim the
   // `[id]:` label, show the URL as a clickable link, and dim the title. Empty
@@ -521,7 +525,7 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
     // ranges it records suppress spurious `#…` pills inside HTML attributes.
     if (htmlOn) {
       const skipHtml = (pos: number) =>
-        inCode(pos) || inTable(pos) || inLink(pos) || inMathBlock(pos);
+        inCode(pos) || inTable(pos) || inLink(pos) || inMathBlock(pos) || inHtmlBlock(pos);
       const res = collectInlineHtml(state, from, to, skipHtml);
       for (const r of res.tagRanges) htmlTagRanges.push(r);
       for (const op of res.ops) {
@@ -539,7 +543,7 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
           // Unresolvable src → leave the raw source visible.
         } else {
           // op.kind === "widget": render sanitized inline HTML, click-to-edit.
-          replaceWith(op.from, op.to, new InlineHtmlWidget(sanitizeInlineHtml(op.raw, baseDir), op.from));
+          replaceWith(op.from, op.to, new InlineHtmlWidget(sanitizeHtml(op.raw, baseDir), op.from));
         }
       }
     }
@@ -550,7 +554,7 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
     const lastLn = state.doc.lineAt(to).number;
     for (; ln <= lastLn; ln++) {
       const line = state.doc.line(ln);
-      if (inTable(line.from) || inCode(line.from)) continue;
+      if (inTable(line.from) || inCode(line.from) || inHtmlBlock(line.from)) continue;
       // Link reference definition line — styled, with placeholders for empty
       // URL/title. (Handled here, not in the tree walk, because an empty
       // `[id]:` isn't a LinkReference node.) Such lines carry no tags.
