@@ -7,7 +7,7 @@ import { scanTagsInLine } from "./tagScan";
 import { resolveHtmlSrc } from "../html/paths";
 import { sanitizeHtml } from "../html/render";
 import { collectInlineHtml } from "./inlineHtml";
-import { InlineHtmlWidget, HtmlBadgeWidget } from "./htmlWidgets";
+import { InlineHtmlWidget } from "./htmlWidgets";
 import { mathBlockRanges } from "./mathField";
 import { htmlBlockRanges, htmlTagBlockRegions } from "./htmlBlockField";
 import {
@@ -597,9 +597,9 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
         if (ln === endLine.number) cls += " cm-md-code-bottom";
         lineClass(l.from, cls);
       }
-      decos.push(
-        Decoration.widget({ widget: new HtmlBadgeWidget(), side: 1 }).range(startLine.from),
-      );
+      // The top-right "HTML" label is drawn by a CSS ::after on cm-md-html-edit-top
+      // (a pseudo-element, so it doesn't sit in the content flow and interfere with
+      // selecting the opening-tag line).
     }
   }
 

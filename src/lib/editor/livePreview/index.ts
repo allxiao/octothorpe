@@ -323,9 +323,12 @@ const livePreviewTheme = EditorView.theme({
   },
   ".cm-md-html-block:hover .cm-md-html-badge": { opacity: "0.85" },
   // Editing a block-HTML region: the block's lines are boxed (reusing the code
-  // box classes); this positions the top-right "HTML" badge on the first line.
+  // box classes); a CSS `::after` on the first line draws the top-right "HTML"
+  // label. A pseudo-element (not a widget) keeps it out of the content flow so it
+  // never interferes with mouse selection over the opening-tag line.
   ".cm-md-html-edit-top": { position: "relative" },
-  ".cm-md-html-edit-badge": {
+  ".cm-md-html-edit-top::after": {
+    content: '"HTML"',
     position: "absolute",
     top: "3px",
     right: "6px",

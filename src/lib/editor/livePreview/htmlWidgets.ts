@@ -134,23 +134,3 @@ export class HtmlCommentWidget extends WidgetType {
   }
 }
 
-/**
- * A small static "HTML" badge shown at the top-right of a block-HTML region while
- * it is being edited (boxed like a math block) — labelling the block the way the
- * "Math" badge labels a `$$…$$` block being edited.
- */
-export class HtmlBadgeWidget extends WidgetType {
-  eq() {
-    return true;
-  }
-  toDOM() {
-    const span = document.createElement("span");
-    span.className = "cm-md-html-edit-badge";
-    span.textContent = "HTML";
-    return span;
-  }
-  ignoreEvent() {
-    return true;
-  }
-}
-
