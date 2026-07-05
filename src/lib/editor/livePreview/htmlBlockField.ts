@@ -55,7 +55,7 @@ function build(state: EditorState): HtmlDecos {
         if (isElementActive(state, node.from, node.to)) return false;
         renders.push(
           Decoration.replace({
-            widget: new HtmlCommentWidget(raw, node.from),
+            widget: new HtmlCommentWidget(raw),
             block: true,
           }).range(node.from, node.to),
         );
@@ -69,7 +69,7 @@ function build(state: EditorState): HtmlDecos {
       if (isElementActive(state, node.from, node.to)) return false;
       renders.push(
         Decoration.replace({
-          widget: new HtmlBlockWidget(raw, node.from, baseDir),
+          widget: new HtmlBlockWidget(raw, baseDir),
           block: true,
         }).range(node.from, node.to),
       );

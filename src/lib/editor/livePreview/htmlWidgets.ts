@@ -45,30 +45,33 @@ export class InlineHtmlWidget extends WidgetType {
 export class HtmlBlockWidget extends WidgetType {
   constructor(
     readonly raw: string,
-    readonly enterPos: number,
     readonly baseDir: string,
   ) {
     super();
   }
+  // Keyed on content only (NOT the block's document position): editing text
+  // *before* the block shifts its position every keystroke, and if that were in
+  // `eq` CodeMirror would rebuild the DOM each time — reloading an <iframe> and
+  // making it flash. Position-only changes now reuse the existing DOM; the
+  // click-to-edit target is resolved live from the DOM instead.
   eq(other: HtmlBlockWidget) {
-    return (
-      other.raw === this.raw &&
-      other.enterPos === this.enterPos &&
-      other.baseDir === this.baseDir
-    );
+    return other.raw === this.raw && other.baseDir === this.baseDir;
   }
   toDOM(view: EditorView) {
     const div = document.createElement("div");
     div.className = "cm-md-html-block";
     div.innerHTML = sanitizeHtml(this.raw, this.baseDir);
 
-    // Click-to-edit badge (does not steal clicks from the body's controls).
+    // Click-to-edit badge (does not steal clicks from the body's controls). The
+    // caret target is read from the widget's current DOM position at click time,
+    // so it stays correct even after the block has shifted (DOM reused).
     const badge = document.createElement("span");
     badge.className = "cm-md-html-badge";
     badge.textContent = "HTML";
     badge.addEventListener("mousedown", (e) => {
       e.preventDefault();
-      view.dispatch({ selection: { anchor: this.enterPos }, scrollIntoView: true });
+      const pos = view.posAtDOM(div);
+      view.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
       view.focus();
     });
     div.appendChild(badge);
@@ -96,14 +99,13 @@ export class HtmlBlockWidget extends WidgetType {
  * the preview. Clicking the chip drops the caret at its start to edit the source.
  */
 export class HtmlCommentWidget extends WidgetType {
-  constructor(
-    readonly raw: string,
-    readonly enterPos: number,
-  ) {
+  constructor(readonly raw: string) {
     super();
   }
+  // Content-only (see HtmlBlockWidget.eq): reuse the DOM when only the position
+  // shifts, and resolve the click-to-edit target live.
   eq(other: HtmlCommentWidget) {
-    return other.raw === this.raw && other.enterPos === this.enterPos;
+    return other.raw === this.raw;
   }
   toDOM(view: EditorView) {
     const div = document.createElement("div");
@@ -119,7 +121,7 @@ export class HtmlCommentWidget extends WidgetType {
     div.title = this.raw;
     div.addEventListener("mousedown", (e) => {
       e.preventDefault();
-      view.dispatch({ selection: { anchor: this.enterPos }, scrollIntoView: true });
+      view.dispatch({ selection: { anchor: view.posAtDOM(div) }, scrollIntoView: true });
       view.focus();
     });
     return div;
