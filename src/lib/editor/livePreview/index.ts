@@ -8,7 +8,7 @@ import {
 import type { Extension } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
 import { buildDecorations } from "./build";
-import { onTagClick, revealSimpleSource, inlineMathRender } from "./config";
+import { onTagClick, revealSimpleSource, inlineMathRender, inlineMathDisplayStyle } from "./config";
 import { tableField } from "./tableField";
 import { mathField } from "./mathField";
 import { inlineMathTooltipField } from "./mathTooltip";
@@ -119,7 +119,8 @@ class LivePreviewPlugin {
       update.viewportChanged ||
       update.selectionSet ||
       update.startState.facet(revealSimpleSource) !== update.state.facet(revealSimpleSource) ||
-      update.startState.facet(inlineMathRender) !== update.state.facet(inlineMathRender)
+      update.startState.facet(inlineMathRender) !== update.state.facet(inlineMathRender) ||
+      update.startState.facet(inlineMathDisplayStyle) !== update.state.facet(inlineMathDisplayStyle)
     ) {
       const built = buildDecorations(update.view);
       this.decorations = built.decorations;

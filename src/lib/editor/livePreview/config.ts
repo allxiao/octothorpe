@@ -34,3 +34,12 @@ export const revealSimpleSource = Facet.define<boolean, boolean>({
 export const inlineMathRender = Facet.define<boolean, boolean>({
   combine: (values) => (values.length ? values[values.length - 1] : true),
 });
+
+/**
+ * Whether inline `$…$` math renders in display style (`\displaystyle`: full-size
+ * fractions, sums with limits, etc.) instead of the compact inline style. Driven
+ * by the `markdown.inlineMathDisplay` preference; defaults to false.
+ */
+export const inlineMathDisplayStyle = Facet.define<boolean, boolean>({
+  combine: (values) => (values.length ? values[values.length - 1] : false),
+});

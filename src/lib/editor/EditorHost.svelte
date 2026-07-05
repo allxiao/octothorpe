@@ -7,7 +7,7 @@
   import { closeBrackets, closeBracketsKeymap, autocompletion } from "@codemirror/autocomplete";
   import { baseExtensions } from "./setup";
   import { livePreview } from "./livePreview";
-  import { imageBaseDir, onTagClick, revealSimpleSource, inlineMathRender } from "./livePreview/config";
+  import { imageBaseDir, onTagClick, revealSimpleSource, inlineMathRender, inlineMathDisplayStyle } from "./livePreview/config";
   import { resolveImageFsPath } from "./livePreview/build";
   import { emojiCompletions } from "./emoji";
   import * as ipc from "../ipc/commands";
@@ -60,6 +60,8 @@
   const revealComp = new Compartment();
   // Inline math rendering toggle (markdown.inlineMath).
   const mathComp = new Compartment();
+  // Inline math display-style toggle (markdown.inlineMathDisplay).
+  const mathDisplayComp = new Compartment();
   // Spell-check content attribute (editor.spellCheck).
   const spellComp = new Compartment();
 
@@ -252,6 +254,7 @@
         autocompleteComp.of(autocompleteExt()),
         revealComp.of(revealSimpleSource.of(editorPrefs.get<boolean>("revealSourceOnFocus"))),
         mathComp.of(inlineMathRender.of(markdownPrefs.get<boolean>("inlineMath"))),
+        mathDisplayComp.of(inlineMathDisplayStyle.of(markdownPrefs.get<boolean>("inlineMathDisplay"))),
         spellComp.of(spellAttrs()),
         // Copy/cut behavior (editor.copyWholeLine / copyMarkdownAsPlain). Only
         // intercept when a preference diverges from CodeMirror's native default.
@@ -395,6 +398,12 @@
   $effect(() => {
     const on = markdownPrefs.get<boolean>("inlineMath");
     if (view) view.dispatch({ effects: mathComp.reconfigure(inlineMathRender.of(on)) });
+  });
+
+  // Live-refresh inline math display style (markdown.inlineMathDisplay).
+  $effect(() => {
+    const on = markdownPrefs.get<boolean>("inlineMathDisplay");
+    if (view) view.dispatch({ effects: mathDisplayComp.reconfigure(inlineMathDisplayStyle.of(on)) });
   });
 
   // Live-refresh the spell-check content attribute.

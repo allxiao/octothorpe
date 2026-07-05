@@ -144,6 +144,13 @@
           "title": "Render inline math",
           "description": "Render inline $…$ LaTeX with KaTeX. When off, $ stays literal in prose (e.g. prices). Block math ($$…$$ and ```math) always renders.",
           "x-ui": { "category": "markdown", "section": "Math", "control": "toggle", "order": 1 }
+        },
+        "inlineMathDisplay": {
+          "type": "boolean",
+          "default": false,
+          "title": "Use display style for inline math",
+          "description": "Render inline $…$ math at full display size (\\displaystyle: large fractions, sums with limits) instead of the compact inline style.",
+          "x-ui": { "category": "markdown", "section": "Math", "control": "toggle", "order": 2 }
         }
       }
     },

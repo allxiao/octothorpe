@@ -41,6 +41,13 @@ export function renderMath(latex: string, displayMode: boolean): string {
   return html;
 }
 
+/** Render inline `$…$` math. When `displaystyle` is set, render at full display
+ *  size (`\displaystyle`: large fractions, sums with limits) while still flowing
+ *  inline. Reuses `renderMath`'s cache via the prefixed source. */
+export function renderInlineMath(latex: string, displaystyle: boolean): string {
+  return renderMath(displaystyle ? "\\displaystyle " + latex : latex, false);
+}
+
 /**
  * Measured pixel height of display-mode KaTeX for `latex`, at the editor's font
  * size. Block math is drawn with `Decoration.replace({block:true})` widgets,

@@ -1,5 +1,5 @@
 import { WidgetType, type EditorView } from "@codemirror/view";
-import { renderMath, measuredMathHeight } from "../math/render";
+import { renderMath, renderInlineMath, measuredMathHeight } from "../math/render";
 
 /**
  * Inline `$…$` rendered in place of its source. Clicking it drops the caret just
@@ -10,16 +10,21 @@ export class InlineMathWidget extends WidgetType {
   constructor(
     readonly latex: string,
     readonly from: number,
+    readonly displaystyle = false,
   ) {
     super();
   }
   eq(other: InlineMathWidget) {
-    return other.latex === this.latex && other.from === this.from;
+    return (
+      other.latex === this.latex &&
+      other.from === this.from &&
+      other.displaystyle === this.displaystyle
+    );
   }
   toDOM(view: EditorView) {
     const span = document.createElement("span");
     span.className = "cm-md-inline-math";
-    span.innerHTML = renderMath(this.latex, false);
+    span.innerHTML = renderInlineMath(this.latex, this.displaystyle);
     span.addEventListener("mousedown", (e) => {
       e.preventDefault();
       view.dispatch({ selection: { anchor: this.from + 1 } });

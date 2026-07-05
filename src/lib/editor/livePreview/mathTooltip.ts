@@ -2,8 +2,8 @@ import { StateField, type EditorState } from "@codemirror/state";
 import { showTooltip, type Tooltip } from "@codemirror/view";
 import { syntaxTree } from "@codemirror/language";
 import { isElementActive } from "./reveal";
-import { inlineMathRender } from "./config";
-import { renderMath } from "../math/render";
+import { inlineMathRender, inlineMathDisplayStyle } from "./config";
+import { renderInlineMath } from "../math/render";
 
 /**
  * Typora-style live preview for inline math: while the caret is inside a `$…$`
@@ -31,6 +31,7 @@ function inlineMathTooltip(state: EditorState): Tooltip | null {
   const { from, to } = target;
   const latex = state.sliceDoc(from + 1, to - 1);
   if (!latex.trim()) return null;
+  const displaystyle = state.facet(inlineMathDisplayStyle);
   return {
     pos: from,
     end: to,
@@ -38,7 +39,7 @@ function inlineMathTooltip(state: EditorState): Tooltip | null {
     create: () => {
       const dom = document.createElement("div");
       dom.className = "cm-md-math-tooltip";
-      dom.innerHTML = renderMath(latex, false);
+      dom.innerHTML = renderInlineMath(latex, displaystyle);
       return { dom };
     },
   };
@@ -50,7 +51,8 @@ export const inlineMathTooltipField = StateField.define<Tooltip | null>({
     if (
       !tr.docChanged &&
       !tr.selection &&
-      tr.startState.facet(inlineMathRender) === tr.state.facet(inlineMathRender)
+      tr.startState.facet(inlineMathRender) === tr.state.facet(inlineMathRender) &&
+      tr.startState.facet(inlineMathDisplayStyle) === tr.state.facet(inlineMathDisplayStyle)
     ) {
       return value;
     }

@@ -3,7 +3,7 @@ import { syntaxTree } from "@codemirror/language";
 import { type Range } from "@codemirror/state";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { isElementActive, isLineActive } from "./reveal";
-import { imageBaseDir, revealSimpleSource, inlineMathRender } from "./config";
+import { imageBaseDir, revealSimpleSource, inlineMathRender, inlineMathDisplayStyle } from "./config";
 import { scanTagsInLine } from "./tagScan";
 import {
   ImageWidget,
@@ -98,6 +98,8 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
   const revealSource = state.facet(revealSimpleSource);
   // Whether inline `$…$` renders (markdown.inlineMath). Block math always renders.
   const inlineMathOn = state.facet(inlineMathRender);
+  // Whether inline math renders in display style (markdown.inlineMathDisplay).
+  const inlineMathDisplay = state.facet(inlineMathDisplayStyle);
 
   // Tables are rendered as editable block widgets (via a StateField); skip any
   // inline decoration inside them.
@@ -245,7 +247,7 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
           if (inlineMathOn && !isElementActive(state, node.from, node.to)) {
             const latex = slice(node.from + 1, node.to - 1);
             const d = Decoration.replace({
-              widget: new InlineMathWidget(latex, node.from),
+              widget: new InlineMathWidget(latex, node.from, inlineMathDisplay),
             }).range(node.from, node.to);
             decos.push(d);
             atomic.push(d);
