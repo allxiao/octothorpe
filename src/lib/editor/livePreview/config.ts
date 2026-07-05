@@ -43,3 +43,12 @@ export const inlineMathRender = Facet.define<boolean, boolean>({
 export const inlineMathDisplayStyle = Facet.define<boolean, boolean>({
   combine: (values) => (values.length ? values[values.length - 1] : false),
 });
+
+/**
+ * Whether embedded HTML renders in the live preview (inline tags in place, block
+ * HTML as click-to-edit widgets) or stays as literal source text. Driven by the
+ * `markdown.renderHtml` preference; defaults to true.
+ */
+export const renderHtml = Facet.define<boolean, boolean>({
+  combine: (values) => (values.length ? values[values.length - 1] : true),
+});

@@ -151,6 +151,13 @@
           "title": "Use display style for inline math",
           "description": "Render inline $…$ math at full display size (\\displaystyle: large fractions, sums with limits) instead of the compact inline style.",
           "x-ui": { "category": "markdown", "section": "Math", "control": "toggle", "order": 2 }
+        },
+        "renderHtml": {
+          "type": "boolean",
+          "default": true,
+          "title": "Render HTML tags",
+          "description": "Render embedded HTML (inline tags like <kbd>/<sup>, and blocks like <details>, <table>, <svg>, video/audio and sandboxed iframes) in the live preview. When off, HTML stays as literal source text.",
+          "x-ui": { "category": "markdown", "section": "HTML", "control": "toggle", "order": 1 }
         }
       }
     },
