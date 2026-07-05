@@ -11,8 +11,10 @@ import { isElementActive } from "./reveal";
  * rendering through the normal pass. Tags a class can't express, plus void tags
  * (`<br>`, `<img>`), are handled by the widget fallback (see `inlineHtmlWidgets`).
  *
- * As with emphasis/inline-math, an element reveals its raw source while the caret
- * is inside it (`isElementActive`).
+ * As with emphasis/inline-math, editing an element reveals its markers: for a
+ * class-expressible tag only the `<tag>`/`</tag>` markers reveal (the content
+ * stays styled, Typora-style); a widget-rendered tag reveals its whole raw
+ * source (a replace widget can't show source and render at once).
  */
 
 /** Tags renderable purely with a CSS class (kept inline-editable). */
@@ -202,15 +204,16 @@ export function collectInlineHtml(
     const open = stack[idx];
     stack.length = idx; // anything above the match was a stray open → left raw
 
-    // Editing this element → leave the raw source visible.
-    if (isElementActive(state, open.from, tag.to)) continue;
-
+    const active = isElementActive(state, open.from, tag.to);
     const cls = MARK_CLASS[open.name];
     if (!cls) {
       // Not class-expressible (e.g. <ruby>, <bdo>) → render the whole span as an
-      // atomic widget, click-to-edit. Drop any ops already emitted inside this
-      // span (e.g. a nested <rt> widget): the outer widget re-renders them, and
-      // overlapping replace decorations are illegal.
+      // atomic widget, click-to-edit. A replace widget can't show source and
+      // render at once, so editing (caret inside) reveals the raw source.
+      if (active) continue;
+      // Drop any ops already emitted inside this span (e.g. a nested <rt>
+      // widget): the outer widget re-renders them, and overlapping replace
+      // decorations are illegal.
       for (let i = ops.length - 1; i >= 0; i--) {
         if (ops[i].from >= open.from && ops[i].to <= tag.to) ops.splice(i, 1);
       }
@@ -218,8 +221,12 @@ export function collectInlineHtml(
       continue;
     }
 
-    ops.push({ kind: "hide", from: open.from, to: open.to });
-    ops.push({ kind: "hide", from: tag.from, to: tag.to });
+    // Class-expressible: the inner content stays styled even while editing
+    // (Typora-style) — only the tag markers reveal. Hide them when idle.
+    if (!active) {
+      ops.push({ kind: "hide", from: open.from, to: open.to });
+      ops.push({ kind: "hide", from: tag.from, to: tag.to });
+    }
     const innerFrom = open.to;
     const innerTo = tag.from;
     if (innerFrom < innerTo) {
