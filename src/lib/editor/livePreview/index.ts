@@ -277,6 +277,9 @@ const livePreviewTheme = EditorView.theme({
   },
   ".cm-html-q": { fontStyle: "italic" },
   ".cm-html-abbr": { textDecoration: "underline dotted", cursor: "help" },
+  // Fallback inline-HTML widget (void tags like <br>, and tags a class can't
+  // express like <ruby>): the sanitized HTML rendered in an editable-on-click span.
+  ".cm-html-inline": { cursor: "text" },
   // Inline math rendered in place of `$…$`.
   ".cm-md-inline-math": { cursor: "text", padding: "0 0.1em" },
   // Live preview tooltip shown below `$…$` while editing it (Typora-style). CM

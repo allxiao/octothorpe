@@ -126,15 +126,15 @@ export interface HtmlTagInfo extends ParsedTag {
 /** A decoration to apply for a rendered inline-HTML pair. */
 export type InlineHtmlOp =
   | { kind: "hide"; from: number; to: number }
-  | { kind: "mark"; from: number; to: number; class: string; attributes?: Record<string, string> };
+  | { kind: "mark"; from: number; to: number; class: string; attributes?: Record<string, string> }
+  | { kind: "widget"; from: number; to: number; raw: string }
+  | { kind: "img"; from: number; to: number; src: string; alt: string };
 
 export interface InlineHtmlResult {
   ops: InlineHtmlOp[];
   /** Every `HTMLTag` node range in the scanned window (for the tag-pill scan to
    *  skip — a `<span style="#fff">` must not spawn a `#fff` pill). */
   tagRanges: { from: number; to: number }[];
-  /** Void/unmatched/non-mark tags left for the widget fallback (M4). */
-  leftover: HtmlTagInfo[];
 }
 
 /**
@@ -149,7 +149,7 @@ export function collectInlineHtml(
 ): InlineHtmlResult {
   const ops: InlineHtmlOp[] = [];
   const tagRanges: { from: number; to: number }[] = [];
-  const leftover: HtmlTagInfo[] = [];
+  const slice = (f: number, t: number) => state.doc.sliceString(f, t);
 
   // Gather HTMLTag nodes in document order.
   const tags: HtmlTagInfo[] = [];
@@ -166,12 +166,24 @@ export function collectInlineHtml(
     },
   });
 
-  // Pair opens with closes via a stack; unmatched tags become leftovers.
+  // Render a self-contained tag (void element) as a widget: `<br>` becomes a
+  // real break, `<img>` reuses the Markdown image widget, others render their
+  // sanitized selves. Editing (caret on the tag) leaves the raw source.
+  const emitVoid = (tag: HtmlTagInfo) => {
+    if (isElementActive(state, tag.from, tag.to)) return;
+    if (tag.name === "img") {
+      const src = attr(tag.raw, "src");
+      if (src) ops.push({ kind: "img", from: tag.from, to: tag.to, src, alt: attr(tag.raw, "alt") ?? "" });
+      return; // no src → leave raw
+    }
+    ops.push({ kind: "widget", from: tag.from, to: tag.to, raw: tag.raw });
+  };
+
+  // Pair opens with closes via a stack; unmatched tags stay as raw source.
   const stack: HtmlTagInfo[] = [];
-  const matched = new Set<HtmlTagInfo>();
   for (const tag of tags) {
     if (tag.kind === "void") {
-      leftover.push(tag);
+      emitVoid(tag);
       continue;
     }
     if (tag.kind === "open") {
@@ -186,28 +198,25 @@ export function collectInlineHtml(
         break;
       }
     }
-    if (idx < 0) {
-      leftover.push(tag);
-      continue;
-    }
+    if (idx < 0) continue; // stray close → leave raw
     const open = stack[idx];
-    // Anything left unmatched above the match is a stray open → leftover.
-    for (let k = stack.length - 1; k > idx; k--) leftover.push(stack[k]);
-    stack.length = idx;
-
-    const cls = MARK_CLASS[open.name];
-    if (!cls) {
-      // Not class-expressible → widget fallback (M4).
-      leftover.push(open, tag);
-      matched.add(open);
-      matched.add(tag);
-      continue;
-    }
-    matched.add(open);
-    matched.add(tag);
+    stack.length = idx; // anything above the match was a stray open → left raw
 
     // Editing this element → leave the raw source visible.
     if (isElementActive(state, open.from, tag.to)) continue;
+
+    const cls = MARK_CLASS[open.name];
+    if (!cls) {
+      // Not class-expressible (e.g. <ruby>, <bdo>) → render the whole span as an
+      // atomic widget, click-to-edit. Drop any ops already emitted inside this
+      // span (e.g. a nested <rt> widget): the outer widget re-renders them, and
+      // overlapping replace decorations are illegal.
+      for (let i = ops.length - 1; i >= 0; i--) {
+        if (ops[i].from >= open.from && ops[i].to <= tag.to) ops.splice(i, 1);
+      }
+      ops.push({ kind: "widget", from: open.from, to: tag.to, raw: slice(open.from, tag.to) });
+      continue;
+    }
 
     ops.push({ kind: "hide", from: open.from, to: open.to });
     ops.push({ kind: "hide", from: tag.from, to: tag.to });
@@ -231,8 +240,6 @@ export function collectInlineHtml(
       });
     }
   }
-  // Stray opens never closed → leftovers.
-  for (const open of stack) if (!matched.has(open)) leftover.push(open);
 
-  return { ops, tagRanges, leftover };
+  return { ops, tagRanges };
 }

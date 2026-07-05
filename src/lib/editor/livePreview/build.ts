@@ -5,7 +5,9 @@ import { isElementActive, isLineActive } from "./reveal";
 import { imageBaseDir, revealSimpleSource, inlineMathRender, inlineMathDisplayStyle, renderHtml } from "./config";
 import { scanTagsInLine } from "./tagScan";
 import { resolveHtmlSrc } from "../html/paths";
+import { sanitizeInlineHtml } from "../html/render";
 import { collectInlineHtml } from "./inlineHtml";
+import { InlineHtmlWidget } from "./htmlWidgets";
 import { mathBlockRanges } from "./mathField";
 import {
   ImageWidget,
@@ -66,7 +68,7 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
   const replaceWith = (
     from: number,
     to: number,
-    w: ImageWidget | HrWidget | BulletWidget | CheckboxWidget,
+    w: ImageWidget | HrWidget | BulletWidget | CheckboxWidget | InlineHtmlWidget,
   ) => {
     const d = Decoration.replace({ widget: w }).range(from, to);
     decos.push(d);
@@ -525,10 +527,19 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
       for (const op of res.ops) {
         if (op.kind === "hide") {
           hide(op.from, op.to);
-        } else {
+        } else if (op.kind === "mark") {
           decos.push(
             Decoration.mark({ class: op.class, attributes: op.attributes }).range(op.from, op.to),
           );
+        } else if (op.kind === "img") {
+          const src = resolveImageSrc(op.src, baseDir);
+          if (src) {
+            replaceWith(op.from, op.to, new ImageWidget(src, op.alt, op.from, op.to, "inline"));
+          }
+          // Unresolvable src → leave the raw source visible.
+        } else {
+          // op.kind === "widget": render sanitized inline HTML, click-to-edit.
+          replaceWith(op.from, op.to, new InlineHtmlWidget(sanitizeInlineHtml(op.raw, baseDir), op.from));
         }
       }
     }
