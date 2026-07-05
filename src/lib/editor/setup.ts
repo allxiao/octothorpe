@@ -8,7 +8,7 @@ import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
 import { markdownLang } from "./markdownLang";
 import { COMMANDS } from "./commands";
 import { autoTable, enterTableUp, enterTableDown } from "./commands/table";
-import { autoCodeFence, autoMathBlock, codeFenceBackspace, codeLangDown, codeLangRight, mathBlockDown, mathBlockUp, MATH_FENCE_RE } from "./commands/block";
+import { autoCodeFence, autoMathBlock, codeFenceBackspace, codeLangDown, codeLangRight, mathBlockDown, mathBlockUp, htmlBlockDown, htmlBlockUp, MATH_FENCE_RE } from "./commands/block";
 import { FENCE_RE } from "./commands/code";
 import { isRowLine, isDelimiterRow } from "./commands/table";
 
@@ -44,6 +44,12 @@ const ensureLineAfterTrailingBlock = EditorState.transactionFilter.of((tr) => {
         break;
       }
     needsLine = hasDelim && lastN - top >= 1;
+  } else if (/^\s*(<\/[a-zA-Z][\w-]*>|-->|<(?:hr|br|img)\b[^>]*>)\s*$/i.test(lastText)) {
+    // Block HTML ending the document: a lone closing tag (`</div>`), a comment
+    // end (`-->`), or a self-contained void block (`<hr>`) renders as an atomic
+    // widget — keep a line below it to place the caret. (Conservative: a lone
+    // line, so inline `</kbd>` inside a paragraph isn't matched.)
+    needsLine = true;
   }
   if (!needsLine) return tr;
   return [tr, { changes: { from: doc.length, insert: "\n" }, sequential: true }];
@@ -167,6 +173,8 @@ export function baseExtensions(onSave?: () => void): Extension[] {
       { key: "ArrowDown", run: enterTableDown },
       { key: "ArrowDown", run: mathBlockDown },
       { key: "ArrowUp", run: mathBlockUp },
+      { key: "ArrowDown", run: htmlBlockDown },
+      { key: "ArrowUp", run: htmlBlockUp },
       { key: "ArrowDown", run: codeLangDown },
       { key: "ArrowRight", run: codeLangRight },
       ...paragraphKeymap,

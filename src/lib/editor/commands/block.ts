@@ -5,6 +5,7 @@ import type { EditorView } from "@codemirror/view";
 import { insertText, mapLines, markerGap, selectedLines } from "./util";
 import { detectFence, FENCE_RE } from "./code";
 import { mathBlockRanges } from "../livePreview/mathField";
+import { htmlBlockRanges } from "../livePreview/htmlBlockField";
 
 const QUOTE_RE = /^(\s*)>\s?/;
 
@@ -326,6 +327,42 @@ export function mathBlockUp(view: EditorView): boolean {
         selection: { anchor: state.doc.line(endLine - 1).to },
         scrollIntoView: true,
       });
+      view.focus();
+      return true;
+    }
+  }
+  return false;
+}
+
+// An idle-rendered block-HTML region is atomic too. These let the caret move
+// into it (to edit): the whole source is editable (no fences), so Down lands at
+// the block's start and Up at its end.
+
+/** Down at the line just above an idle block-HTML render enters it. */
+export function htmlBlockDown(view: EditorView): boolean {
+  const { state } = view;
+  const sel = state.selection.main;
+  if (!sel.empty) return false;
+  const curLine = state.doc.lineAt(sel.head).number;
+  for (const r of htmlBlockRanges(state)) {
+    if (state.doc.lineAt(r.from).number === curLine + 1) {
+      view.dispatch({ selection: { anchor: r.from }, scrollIntoView: true });
+      view.focus();
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Up at the line just below an idle block-HTML render enters it (at its end). */
+export function htmlBlockUp(view: EditorView): boolean {
+  const { state } = view;
+  const sel = state.selection.main;
+  if (!sel.empty) return false;
+  const curLine = state.doc.lineAt(sel.head).number;
+  for (const r of htmlBlockRanges(state)) {
+    if (state.doc.lineAt(r.to).number === curLine - 1) {
+      view.dispatch({ selection: { anchor: r.to }, scrollIntoView: true });
       view.focus();
       return true;
     }
