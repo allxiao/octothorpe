@@ -289,6 +289,12 @@ const livePreviewTheme = EditorView.theme({
     position: "relative",
     padding: "0.3em 0",
     overflowX: "auto",
+    // CodeMirror sets white-space: pre-wrap on .cm-content to preserve editor
+    // whitespace; the rendered widget inherits it, which would keep the source
+    // newlines/indentation. Reset to normal so the HTML collapses whitespace the
+    // way a browser renders it (leading indentation disappears). <pre> keeps its
+    // own UA white-space rule.
+    whiteSpace: "normal",
   },
   ".cm-md-html-block img, .cm-md-html-block video, .cm-md-html-block svg": {
     maxWidth: "100%",
