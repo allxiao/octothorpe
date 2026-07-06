@@ -1,9 +1,9 @@
 import { EditorView, keymap, drawSelection, rectangularSelection,
   highlightActiveLine } from "@codemirror/view";
 import type { Extension } from "@codemirror/state";
-import { EditorState } from "@codemirror/state";
+import { EditorState, EditorSelection } from "@codemirror/state";
 import { defaultKeymap, history, historyKeymap, indentMore, indentLess } from "@codemirror/commands";
-import { syntaxHighlighting, defaultHighlightStyle, bracketMatching, indentUnit } from "@codemirror/language";
+import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from "@codemirror/language";
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
 import { markdownLang } from "./markdownLang";
 import { htmlTagComplete } from "./htmlComplete";
@@ -103,10 +103,12 @@ const paragraphKeymap = PARAGRAPH_KEYS.map(({ key, id }) => ({
 }));
 
 /**
- * Tab inserts one indentation unit at the caret: mid-line it acts like a literal
- * tab, and at the line start it adds a level of indentation (the unit is spaces,
- * per `indentUnit` / the indentSize preference). With a non-empty selection it
- * indents the covered lines instead (`indentMore`); Shift-Tab outdents.
+ * Tab inserts spaces up to the next tab stop — a multiple of the indent size
+ * (Editor / Indent Size) measured from the line start. Mid-line it aligns the
+ * caret to the next stop (e.g. size 4: `abc` + Tab → `abc `, then → `abc     `);
+ * at the line start it inserts a full unit, i.e. one indentation level. With a
+ * non-empty selection it indents the covered lines instead (`indentMore`);
+ * Shift-Tab outdents.
  *
  * This replaces `indentWithTab`, whose Tab always indented the whole line
  * regardless of caret position.
@@ -114,11 +116,17 @@ const paragraphKeymap = PARAGRAPH_KEYS.map(({ key, id }) => ({
 function insertIndentAtCaret(view: EditorView): boolean {
   const { state } = view;
   if (state.selection.ranges.some((r) => !r.empty)) return indentMore(view);
+  const size = state.tabSize;
   view.dispatch(
-    state.update(state.replaceSelection(state.facet(indentUnit)), {
-      scrollIntoView: true,
-      userEvent: "input",
+    state.changeByRange((range) => {
+      const col = range.head - state.doc.lineAt(range.head).from;
+      const n = size - (col % size); // spaces to the next tab stop (1..size)
+      return {
+        changes: { from: range.head, insert: " ".repeat(n) },
+        range: EditorSelection.cursor(range.head + n),
+      };
     }),
+    { scrollIntoView: true, userEvent: "input" },
   );
   return true;
 }
