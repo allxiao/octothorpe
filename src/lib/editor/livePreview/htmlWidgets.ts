@@ -95,8 +95,15 @@ export class HtmlBlockWidget extends WidgetType {
     return div;
   }
   // Let native events through (summary toggle, video controls); the atomic range
-  // keeps the caret from landing inside on a stray click.
-  ignoreEvent() {
+  // keeps the caret from landing inside on a stray click. Exception: a mousedown
+  // on a link must NOT be processed by the editor — it would move the caret into
+  // the block and reveal its source. Ignoring the mousedown keeps the anchor in
+  // place so the link's *click* reaches the editor handler (Ctrl/Cmd-click opens
+  // it; a plain click's navigation is cancelled), matching Markdown links.
+  ignoreEvent(event: Event) {
+    if (event.type === "mousedown") {
+      return !!(event.target as HTMLElement | null)?.closest?.("a[href]");
+    }
     return false;
   }
   get estimatedHeight() {
