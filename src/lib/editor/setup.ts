@@ -2,8 +2,8 @@ import { EditorView, keymap, drawSelection, rectangularSelection,
   highlightActiveLine } from "@codemirror/view";
 import type { Extension } from "@codemirror/state";
 import { EditorState } from "@codemirror/state";
-import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
-import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from "@codemirror/language";
+import { defaultKeymap, history, historyKeymap, indentMore, indentLess } from "@codemirror/commands";
+import { syntaxHighlighting, defaultHighlightStyle, bracketMatching, indentUnit } from "@codemirror/language";
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
 import { markdownLang } from "./markdownLang";
 import { htmlTagComplete } from "./htmlComplete";
@@ -102,6 +102,27 @@ const paragraphKeymap = PARAGRAPH_KEYS.map(({ key, id }) => ({
   run: (view: EditorView) => COMMANDS[id](view),
 }));
 
+/**
+ * Tab inserts one indentation unit at the caret: mid-line it acts like a literal
+ * tab, and at the line start it adds a level of indentation (the unit is spaces,
+ * per `indentUnit` / the indentSize preference). With a non-empty selection it
+ * indents the covered lines instead (`indentMore`); Shift-Tab outdents.
+ *
+ * This replaces `indentWithTab`, whose Tab always indented the whole line
+ * regardless of caret position.
+ */
+function insertIndentAtCaret(view: EditorView): boolean {
+  const { state } = view;
+  if (state.selection.ranges.some((r) => !r.empty)) return indentMore(view);
+  view.dispatch(
+    state.update(state.replaceSelection(state.facet(indentUnit)), {
+      scrollIntoView: true,
+      userEvent: "input",
+    }),
+  );
+  return true;
+}
+
 // Table-navigation keys: only consume the key when the caret is in a table (the
 // command returns false otherwise), so they fall through to CodeMirror defaults.
 const TABLE_KEYS: { key: string; id: string }[] = [
@@ -166,7 +187,7 @@ export function baseExtensions(onSave?: () => void): Extension[] {
           return true;
         },
       },
-      indentWithTab,
+      { key: "Tab", run: insertIndentAtCaret, shift: indentLess },
       { key: "Backspace", run: codeFenceBackspace },
       { key: "Enter", run: autoMathBlock },
       { key: "Enter", run: autoCodeFence },
