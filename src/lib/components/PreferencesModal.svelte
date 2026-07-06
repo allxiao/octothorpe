@@ -145,7 +145,7 @@
             <h4>{section.label}</h4>
             {#each section.entries as entry (entry.key)}
               {#if !entry.inline && visible(entry)}
-                <div class="row">
+                <div class="row" class:child={!!entry.showWhen}>
                   <div class="meta">
                     <label class="lbl" for={`pref-${entry.key}`}>{entry.label}</label>
                     {#if entry.description}<p class="desc">{entry.description}</p>{/if}
@@ -278,6 +278,23 @@
     gap: 24px;
     padding: 12px 0;
     border-bottom: 1px solid var(--border);
+  }
+  /* Conditional settings (shown only while a parent toggle is on) are indented
+     with a guide rail so they read as children of the setting above. */
+  .row.child {
+    padding-left: 26px;
+    position: relative;
+  }
+  .row.child::before {
+    content: "";
+    position: absolute;
+    left: 9px;
+    top: 0;
+    bottom: 50%;
+    width: 10px;
+    border-left: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    border-bottom-left-radius: 4px;
   }
   .meta {
     min-width: 0;
