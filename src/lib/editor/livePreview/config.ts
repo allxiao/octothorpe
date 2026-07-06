@@ -67,3 +67,8 @@ export const renderSuperscript = Facet.define<boolean, boolean>({
 export const renderHighlight = Facet.define<boolean, boolean>({
   combine: (values) => (values.length ? values[values.length - 1] : true),
 });
+
+/** Whether `:name:` shortcodes render as emoji glyphs (markdown.emoji); default true. */
+export const renderEmoji = Facet.define<boolean, boolean>({
+  combine: (values) => (values.length ? values[values.length - 1] : true),
+});

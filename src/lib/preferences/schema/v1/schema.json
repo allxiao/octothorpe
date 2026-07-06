@@ -173,6 +173,13 @@
           "description": "Render ==text== as highlighted text (e.g. ==key==).",
           "x-ui": { "category": "markdown", "section": "Syntax Support", "control": "toggle", "order": 5 }
         },
+        "emoji": {
+          "type": "boolean",
+          "default": true,
+          "title": "Emoji",
+          "description": "Render :name: shortcodes as emoji (e.g. :smile: as 😄).",
+          "x-ui": { "category": "markdown", "section": "Syntax Support", "control": "toggle", "order": 6 }
+        },
         "renderHtml": {
           "type": "boolean",
           "default": true,

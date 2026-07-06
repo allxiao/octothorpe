@@ -257,6 +257,9 @@ const livePreviewTheme = EditorView.theme({
   ".cm-md-sub": { verticalAlign: "sub", fontSize: "0.8em" },
   ".cm-md-sup": { verticalAlign: "super", fontSize: "0.8em" },
   ".cm-md-highlight": { background: "#fef08a", color: "#000", borderRadius: "2px", padding: "0 0.15em" },
+  // Emoji rendered from a `:name:` shortcode. Inline-block so the atomic replace
+  // widget sits on the text baseline; keep the default (non-monospace) font.
+  ".cm-md-emoji": { display: "inline-block", fontFamily: "initial", fontStyle: "normal" },
   // Rendered inline HTML tags (Typora-style). Kept inline-editable via mark
   // decorations; the tag markers are hidden while the caret is outside.
   ".cm-html-kbd": {

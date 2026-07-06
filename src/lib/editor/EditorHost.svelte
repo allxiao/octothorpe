@@ -7,7 +7,7 @@
   import { closeBrackets, closeBracketsKeymap, autocompletion } from "@codemirror/autocomplete";
   import { baseExtensions } from "./setup";
   import { livePreview } from "./livePreview";
-  import { imageBaseDir, onTagClick, revealSimpleSource, inlineMathRender, inlineMathDisplayStyle, renderHtml, renderSubscript, renderSuperscript, renderHighlight } from "./livePreview/config";
+  import { imageBaseDir, onTagClick, revealSimpleSource, inlineMathRender, inlineMathDisplayStyle, renderHtml, renderSubscript, renderSuperscript, renderHighlight, renderEmoji } from "./livePreview/config";
   import { resolveImageFsPath } from "./livePreview/build";
   import { emojiCompletions } from "./emoji";
   import * as ipc from "../ipc/commands";
@@ -68,6 +68,8 @@
   const subComp = new Compartment();
   const supComp = new Compartment();
   const highlightComp = new Compartment();
+  // Emoji shortcode rendering (markdown.emoji).
+  const emojiComp = new Compartment();
   // Spell-check content attribute (editor.spellCheck).
   const spellComp = new Compartment();
 
@@ -265,6 +267,7 @@
         subComp.of(renderSubscript.of(markdownPrefs.get<boolean>("subscript"))),
         supComp.of(renderSuperscript.of(markdownPrefs.get<boolean>("superscript"))),
         highlightComp.of(renderHighlight.of(markdownPrefs.get<boolean>("highlight"))),
+        emojiComp.of(renderEmoji.of(markdownPrefs.get<boolean>("emoji"))),
         spellComp.of(spellAttrs()),
         // Copy/cut behavior (editor.copyWholeLine / copyMarkdownAsPlain). Only
         // intercept when a preference diverges from CodeMirror's native default.
@@ -434,6 +437,10 @@
   $effect(() => {
     const on = markdownPrefs.get<boolean>("highlight");
     if (view) view.dispatch({ effects: highlightComp.reconfigure(renderHighlight.of(on)) });
+  });
+  $effect(() => {
+    const on = markdownPrefs.get<boolean>("emoji");
+    if (view) view.dispatch({ effects: emojiComp.reconfigure(renderEmoji.of(on)) });
   });
 
   // Live-refresh the spell-check content attribute.

@@ -5,7 +5,12 @@
 
 import type { CompletionContext, CompletionResult, Completion } from "@codemirror/autocomplete";
 
-/** `:shortcode` → emoji. Common, high-frequency entries. */
+/**
+ * `:shortcode` → emoji. Common, high-frequency entries. Shared with the live
+ * preview: the parser validates a `:name:` against these keys and the renderer
+ * looks up the glyph (see `emojiFor`), so autocomplete and rendering agree on
+ * exactly which shortcodes are known.
+ */
 const EMOJI: Record<string, string> = {
   smile: "😄",
   smiley: "😃",
@@ -197,4 +202,13 @@ export function emojiCompletions(context: CompletionContext): CompletionResult |
   const options = OPTIONS.filter((o) => o.label.slice(1, -1).startsWith(typed));
   if (!options.length) return null;
   return { from: before.from, to: context.pos, options, filter: false };
+}
+
+/**
+ * Glyph for a `:name:` shortcode, or `undefined` if the name isn't a known
+ * emoji. Used by the Markdown parser (to decide whether a `:name:` run is an
+ * emoji) and the live-preview renderer (to fetch the glyph). Case-insensitive.
+ */
+export function emojiFor(name: string): string | undefined {
+  return EMOJI[name.toLowerCase()];
 }

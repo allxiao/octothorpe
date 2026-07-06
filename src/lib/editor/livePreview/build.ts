@@ -2,12 +2,14 @@ import { Decoration, type DecorationSet, type EditorView } from "@codemirror/vie
 import { syntaxTree } from "@codemirror/language";
 import { type Range } from "@codemirror/state";
 import { isElementActive, isLineActive } from "./reveal";
-import { imageBaseDir, revealSimpleSource, inlineMathRender, inlineMathDisplayStyle, renderHtml, renderSubscript, renderSuperscript, renderHighlight } from "./config";
+import { imageBaseDir, revealSimpleSource, inlineMathRender, inlineMathDisplayStyle, renderHtml, renderSubscript, renderSuperscript, renderHighlight, renderEmoji } from "./config";
 import { scanTagsInLine } from "./tagScan";
 import { resolveHtmlSrc } from "../html/paths";
 import { sanitizeHtml } from "../html/render";
 import { collectInlineHtml } from "./inlineHtml";
 import { InlineHtmlWidget } from "./htmlWidgets";
+import { EmojiWidget } from "./emojiWidget";
+import { emojiFor } from "../emoji";
 import { mathBlockRanges } from "./mathField";
 import { htmlBlockRanges, htmlTagBlockRegions } from "./htmlBlockField";
 import {
@@ -69,7 +71,7 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
   const replaceWith = (
     from: number,
     to: number,
-    w: ImageWidget | HrWidget | BulletWidget | CheckboxWidget | InlineHtmlWidget,
+    w: ImageWidget | HrWidget | BulletWidget | CheckboxWidget | InlineHtmlWidget | EmojiWidget,
   ) => {
     const d = Decoration.replace({ widget: w }).range(from, to);
     decos.push(d);
@@ -121,6 +123,8 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
   const subOn = state.facet(renderSubscript);
   const supOn = state.facet(renderSuperscript);
   const hlOn = state.facet(renderHighlight);
+  // Whether `:name:` shortcodes render as emoji glyphs (markdown.emoji).
+  const emojiOn = state.facet(renderEmoji);
   // Math blocks rendered idle (by mathField) — the inline-HTML pass skips them.
   const mathBlocks = mathBlockRanges(state);
   const inMathBlock = (pos: number) => mathBlocks.some((r) => pos >= r.from && pos < r.to);
@@ -387,6 +391,15 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
         }
         if (name === "Highlight") {
           if (hlOn) mark(node.from, node.to, "cm-md-highlight");
+          return;
+        }
+        // --- Emoji shortcode (`:smile:`): replace with the glyph; reveal the
+        //     raw `:name:` source while the caret is inside it. ---
+        if (name === "Emoji") {
+          if (emojiOn && !isElementActive(state, node.from, node.to)) {
+            const glyph = emojiFor(slice(node.from + 1, node.to - 1));
+            if (glyph) replaceWith(node.from, node.to, new EmojiWidget(glyph, node.from));
+          }
           return;
         }
 
