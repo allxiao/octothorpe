@@ -114,9 +114,16 @@
     ];
   }
 
+  // The emoji glyph rides in each completion's `detail`, which CodeMirror
+  // styles italic by default — an emoji shouldn't be slanted. Emoji is the only
+  // completion source, so it's safe to make the detail upright globally.
+  const emojiCompletionTheme = EditorView.theme({
+    ".cm-completionDetail": { fontStyle: "normal" },
+  });
+
   function autocompleteExt() {
     return editorPrefs.get<boolean>("emojiAutocomplete")
-      ? autocompletion({ override: [emojiCompletions] })
+      ? [autocompletion({ override: [emojiCompletions] }), emojiCompletionTheme]
       : [];
   }
 
