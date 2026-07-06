@@ -150,7 +150,7 @@
           "default": false,
           "title": "Use display style for inline math",
           "description": "Render inline $…$ math at full display size (\\displaystyle: large fractions, sums with limits) instead of the compact inline style.",
-          "x-ui": { "category": "markdown", "section": "Syntax Support", "control": "toggle", "order": 2 }
+          "x-ui": { "category": "markdown", "section": "Syntax Support", "control": "toggle", "order": 2, "showWhen": { "key": "markdown.inlineMath", "equals": "true" } }
         },
         "subscript": {
           "type": "boolean",
