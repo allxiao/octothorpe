@@ -611,21 +611,6 @@ const livePreviewTheme = EditorView.theme({
 const interactionHandlers = EditorView.domEventHandlers({
   mousedown(event, view) {
     const target = event.target as HTMLElement | null;
-    // A link inside rendered HTML (a block widget or inline fallback) opens on a
-    // plain click — the surrounding content is non-editable, so there's no caret
-    // gesture to preserve. Internal `#anchor` links jump within the doc.
-    const htmlLink = target?.closest?.(".cm-md-html-block a[href], .cm-html-inline a[href]") as
-      | HTMLAnchorElement
-      | null;
-    if (htmlLink) {
-      const href = htmlLink.getAttribute("href");
-      if (href) {
-        event.preventDefault();
-        if (href.startsWith("#")) jumpToAnchor(view, href.slice(1));
-        else openExternal(href);
-        return true;
-      }
-    }
     // Ctrl/Cmd + click on a link opens it externally; a plain click falls
     // through to normal caret placement (which reveals the source for editing).
     const link = target?.closest?.(".cm-md-link");
@@ -650,6 +635,26 @@ const interactionHandlers = EditorView.domEventHandlers({
       view.state.facet(onTagClick)?.(tag);
     }
     return false;
+  },
+  // Links inside rendered HTML are real <a href> elements, so a plain click would
+  // navigate the app's own webview (and a mousedown preventDefault can't stop
+  // that — navigation fires on `click`). Cancel the native navigation and align
+  // with Markdown links: only Ctrl/Cmd + click opens the target (externally, or
+  // an in-doc jump for `#anchor`); a plain click just places the caret.
+  click(event, view) {
+    const a = (event.target as HTMLElement | null)?.closest?.(
+      ".cm-md-html-block a[href], .cm-html-inline a[href]",
+    );
+    if (!a) return false;
+    event.preventDefault();
+    if (event.ctrlKey || event.metaKey) {
+      const href = a.getAttribute("href");
+      if (href) {
+        if (href.startsWith("#")) jumpToAnchor(view, href.slice(1));
+        else openExternal(href);
+      }
+    }
+    return true;
   },
   // When the caret lands in normal editor text (not a table cell), forget the
   // last-active table so the Paragraph → Table menu greys out again.

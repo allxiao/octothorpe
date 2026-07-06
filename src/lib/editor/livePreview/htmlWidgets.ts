@@ -23,13 +23,24 @@ export class InlineHtmlWidget extends WidgetType {
     span.className = "cm-html-inline";
     span.innerHTML = this.html;
     span.addEventListener("mousedown", (e) => {
+      // A link owns its own gesture (see `ignoreEvent` + the editor's click
+      // handler): don't reveal the source here, or the anchor would detach
+      // before the click fires and the webview would navigate to it.
+      if ((e.target as HTMLElement | null)?.closest?.("a[href]")) return;
       e.preventDefault();
       view.dispatch({ selection: { anchor: this.from } });
       view.focus();
     });
     return span;
   }
-  ignoreEvent() {
+  ignoreEvent(event: Event) {
+    // Let the editor's own handlers see *clicks on links*, so a plain click's
+    // native navigation is cancelled and a Ctrl/Cmd-click opens the target
+    // externally — matching Markdown links. Every other event stays with this
+    // widget (so the caret isn't disturbed).
+    if (event.type === "click") {
+      return !(event.target as HTMLElement | null)?.closest?.("a[href]");
+    }
     return true;
   }
 }
