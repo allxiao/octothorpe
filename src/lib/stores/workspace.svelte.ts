@@ -299,6 +299,17 @@ class Workspace {
     }
   }
 
+  /** Launch the OS native emoji/symbol picker; the glyph lands wherever the
+   *  caret is, so focus the editor first. */
+  async openEmojiPicker() {
+    this.#editor?.focus();
+    try {
+      await ipc.openEmojiPicker();
+    } catch (e) {
+      this.status = `Emoji picker failed: ${e}`;
+    }
+  }
+
   async copyAsMarkdown() {
     try {
       const md = this.#editor?.selectionOrDoc() ?? "";

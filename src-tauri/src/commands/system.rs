@@ -80,6 +80,15 @@ pub fn open_url(url: String) -> AppResult<()> {
     open_url_impl(&url)
 }
 
+/// Launch the OS's native emoji / symbol picker (Windows emoji panel via Win+.,
+/// macOS Character Viewer via Ctrl+Cmd+Space). The panel inserts into whatever
+/// control has focus, so the caller focuses the editor first. Best-effort: a
+/// silent no-op on platforms without a standard picker.
+#[tauri::command]
+pub fn open_emoji_picker() -> AppResult<()> {
+    open_emoji_picker_impl()
+}
+
 // --- Properties: per-OS native dialog -------------------------------------
 
 #[cfg(windows)]
@@ -213,5 +222,62 @@ fn open_url_impl(url: &str) -> AppResult<()> {
         .arg(url)
         .spawn()
         .map_err(|e| AppError::Other(format!("xdg-open failed: {e}")))?;
+    Ok(())
+}
+
+// --- Native emoji / symbol picker: per-OS ---------------------------------
+
+#[cfg(windows)]
+fn open_emoji_picker_impl() -> AppResult<()> {
+    use windows::Win32::UI::Input::KeyboardAndMouse::{
+        SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP,
+        VIRTUAL_KEY, VK_LWIN, VK_OEM_PERIOD,
+    };
+
+    fn key(vk: VIRTUAL_KEY, flags: KEYBD_EVENT_FLAGS) -> INPUT {
+        INPUT {
+            r#type: INPUT_KEYBOARD,
+            Anonymous: INPUT_0 {
+                ki: KEYBDINPUT {
+                    wVk: vk,
+                    wScan: 0,
+                    dwFlags: flags,
+                    time: 0,
+                    dwExtraInfo: 0,
+                },
+            },
+        }
+    }
+
+    // There's no public API to open the emoji panel, so synthesize its shortcut:
+    // press Win + '.', then release '.' + Win.
+    let inputs = [
+        key(VK_LWIN, KEYBD_EVENT_FLAGS(0)),
+        key(VK_OEM_PERIOD, KEYBD_EVENT_FLAGS(0)),
+        key(VK_OEM_PERIOD, KEYEVENTF_KEYUP),
+        key(VK_LWIN, KEYEVENTF_KEYUP),
+    ];
+    unsafe {
+        SendInput(&inputs, std::mem::size_of::<INPUT>() as i32);
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn open_emoji_picker_impl() -> AppResult<()> {
+    // Character Viewer shortcut: Ctrl+Cmd+Space (key code 49 = Space).
+    std::process::Command::new("osascript")
+        .args([
+            "-e",
+            "tell application \"System Events\" to key code 49 using {control down, command down}",
+        ])
+        .spawn()
+        .map_err(|e| AppError::Other(format!("osascript failed: {e}")))?;
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+fn open_emoji_picker_impl() -> AppResult<()> {
+    // No universal emoji panel across desktop environments — best-effort no-op.
     Ok(())
 }

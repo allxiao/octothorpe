@@ -193,6 +193,14 @@
         <button
           role="menuitem"
           disabled={!workspace.hasDoc}
+          onclick={() => run(() => workspace.openEmojiPicker())}
+        >
+          Emoji &amp; Symbols
+        </button>
+        <div class="sep"></div>
+        <button
+          role="menuitem"
+          disabled={!workspace.hasDoc}
           onclick={() => run(() => workspace.copyAsPlainText())}
         >
           Copy as Plain Text
