@@ -250,6 +250,10 @@
     min-width: 0;
     padding: 18px 24px 24px;
     overflow-y: auto;
+    /* Always reserve the scrollbar's space so the content width doesn't shift
+       when conditional rows (e.g. showWhen) grow the list past the viewport and
+       the scrollbar appears/disappears. */
+    scrollbar-gutter: stable;
   }
   .pane-title {
     margin: 0 0 4px;
