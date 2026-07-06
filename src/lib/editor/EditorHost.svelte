@@ -7,7 +7,7 @@
   import { closeBrackets, closeBracketsKeymap, autocompletion } from "@codemirror/autocomplete";
   import { baseExtensions } from "./setup";
   import { livePreview } from "./livePreview";
-  import { imageBaseDir, onTagClick, revealSimpleSource, inlineMathRender, inlineMathDisplayStyle, renderHtml } from "./livePreview/config";
+  import { imageBaseDir, onTagClick, revealSimpleSource, inlineMathRender, inlineMathDisplayStyle, renderHtml, renderSubscript, renderSuperscript, renderHighlight } from "./livePreview/config";
   import { resolveImageFsPath } from "./livePreview/build";
   import { emojiCompletions } from "./emoji";
   import * as ipc from "../ipc/commands";
@@ -64,6 +64,10 @@
   const mathDisplayComp = new Compartment();
   // Embedded HTML rendering toggle (markdown.renderHtml).
   const htmlComp = new Compartment();
+  // Sub/superscript and highlight toggles (markdown.subscript/superscript/highlight).
+  const subComp = new Compartment();
+  const supComp = new Compartment();
+  const highlightComp = new Compartment();
   // Spell-check content attribute (editor.spellCheck).
   const spellComp = new Compartment();
 
@@ -258,6 +262,9 @@
         mathComp.of(inlineMathRender.of(markdownPrefs.get<boolean>("inlineMath"))),
         mathDisplayComp.of(inlineMathDisplayStyle.of(markdownPrefs.get<boolean>("inlineMathDisplay"))),
         htmlComp.of(renderHtml.of(markdownPrefs.get<boolean>("renderHtml"))),
+        subComp.of(renderSubscript.of(markdownPrefs.get<boolean>("subscript"))),
+        supComp.of(renderSuperscript.of(markdownPrefs.get<boolean>("superscript"))),
+        highlightComp.of(renderHighlight.of(markdownPrefs.get<boolean>("highlight"))),
         spellComp.of(spellAttrs()),
         // Copy/cut behavior (editor.copyWholeLine / copyMarkdownAsPlain). Only
         // intercept when a preference diverges from CodeMirror's native default.
@@ -413,6 +420,20 @@
   $effect(() => {
     const on = markdownPrefs.get<boolean>("renderHtml");
     if (view) view.dispatch({ effects: htmlComp.reconfigure(renderHtml.of(on)) });
+  });
+
+  // Live-refresh sub/superscript and highlight rendering.
+  $effect(() => {
+    const on = markdownPrefs.get<boolean>("subscript");
+    if (view) view.dispatch({ effects: subComp.reconfigure(renderSubscript.of(on)) });
+  });
+  $effect(() => {
+    const on = markdownPrefs.get<boolean>("superscript");
+    if (view) view.dispatch({ effects: supComp.reconfigure(renderSuperscript.of(on)) });
+  });
+  $effect(() => {
+    const on = markdownPrefs.get<boolean>("highlight");
+    if (view) view.dispatch({ effects: highlightComp.reconfigure(renderHighlight.of(on)) });
   });
 
   // Live-refresh the spell-check content attribute.

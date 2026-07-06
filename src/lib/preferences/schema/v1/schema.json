@@ -141,16 +141,37 @@
         "inlineMath": {
           "type": "boolean",
           "default": true,
-          "title": "Render inline math",
-          "description": "Render inline $…$ LaTeX with KaTeX. When off, $ stays literal in prose (e.g. prices). Block math ($$…$$ and ```math) always renders.",
-          "x-ui": { "category": "markdown", "section": "Math", "control": "toggle", "order": 1 }
+          "title": "Inline Math",
+          "description": "Render inline $…$ LaTeX with KaTeX (e.g. $\\LaTeX$). When off, $ stays literal in prose (e.g. prices). Block math ($$…$$ and ```math) always renders.",
+          "x-ui": { "category": "markdown", "section": "Syntax Support", "control": "toggle", "order": 1 }
         },
         "inlineMathDisplay": {
           "type": "boolean",
           "default": false,
           "title": "Use display style for inline math",
           "description": "Render inline $…$ math at full display size (\\displaystyle: large fractions, sums with limits) instead of the compact inline style.",
-          "x-ui": { "category": "markdown", "section": "Math", "control": "toggle", "order": 2 }
+          "x-ui": { "category": "markdown", "section": "Syntax Support", "control": "toggle", "order": 2 }
+        },
+        "subscript": {
+          "type": "boolean",
+          "default": true,
+          "title": "Subscript",
+          "description": "Render ~text~ as subscript (e.g. H~2~O).",
+          "x-ui": { "category": "markdown", "section": "Syntax Support", "control": "toggle", "order": 3 }
+        },
+        "superscript": {
+          "type": "boolean",
+          "default": true,
+          "title": "Superscript",
+          "description": "Render ^text^ as superscript (e.g. X^2^).",
+          "x-ui": { "category": "markdown", "section": "Syntax Support", "control": "toggle", "order": 4 }
+        },
+        "highlight": {
+          "type": "boolean",
+          "default": true,
+          "title": "Highlight",
+          "description": "Render ==text== as highlighted text (e.g. ==key==).",
+          "x-ui": { "category": "markdown", "section": "Syntax Support", "control": "toggle", "order": 5 }
         },
         "renderHtml": {
           "type": "boolean",

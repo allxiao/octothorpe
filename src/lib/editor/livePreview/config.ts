@@ -52,3 +52,18 @@ export const inlineMathDisplayStyle = Facet.define<boolean, boolean>({
 export const renderHtml = Facet.define<boolean, boolean>({
   combine: (values) => (values.length ? values[values.length - 1] : true),
 });
+
+/** Whether `~x~` renders as subscript (markdown.subscript); default true. */
+export const renderSubscript = Facet.define<boolean, boolean>({
+  combine: (values) => (values.length ? values[values.length - 1] : true),
+});
+
+/** Whether `^x^` renders as superscript (markdown.superscript); default true. */
+export const renderSuperscript = Facet.define<boolean, boolean>({
+  combine: (values) => (values.length ? values[values.length - 1] : true),
+});
+
+/** Whether `==x==` renders as highlighted text (markdown.highlight); default true. */
+export const renderHighlight = Facet.define<boolean, boolean>({
+  combine: (values) => (values.length ? values[values.length - 1] : true),
+});

@@ -8,7 +8,7 @@ import {
 import type { Extension } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
 import { buildDecorations } from "./build";
-import { onTagClick, revealSimpleSource, inlineMathRender, inlineMathDisplayStyle, renderHtml } from "./config";
+import { onTagClick, revealSimpleSource, inlineMathRender, inlineMathDisplayStyle, renderHtml, renderSubscript, renderSuperscript, renderHighlight } from "./config";
 import { tableField } from "./tableField";
 import { mathField } from "./mathField";
 import { htmlBlockField } from "./htmlBlockField";
@@ -122,7 +122,10 @@ class LivePreviewPlugin {
       update.startState.facet(revealSimpleSource) !== update.state.facet(revealSimpleSource) ||
       update.startState.facet(inlineMathRender) !== update.state.facet(inlineMathRender) ||
       update.startState.facet(inlineMathDisplayStyle) !== update.state.facet(inlineMathDisplayStyle) ||
-      update.startState.facet(renderHtml) !== update.state.facet(renderHtml)
+      update.startState.facet(renderHtml) !== update.state.facet(renderHtml) ||
+      update.startState.facet(renderSubscript) !== update.state.facet(renderSubscript) ||
+      update.startState.facet(renderSuperscript) !== update.state.facet(renderSuperscript) ||
+      update.startState.facet(renderHighlight) !== update.state.facet(renderHighlight)
     ) {
       const built = buildDecorations(update.view);
       this.decorations = built.decorations;
@@ -250,6 +253,10 @@ const livePreviewTheme = EditorView.theme({
     color: "#fff",
   },
   ".cm-md-strike": { textDecoration: "line-through", opacity: "0.7" },
+  // Pandoc-style subscript (`~x~`), superscript (`^x^`) and ==highlight==.
+  ".cm-md-sub": { verticalAlign: "sub", fontSize: "0.8em" },
+  ".cm-md-sup": { verticalAlign: "super", fontSize: "0.8em" },
+  ".cm-md-highlight": { background: "#fef08a", color: "#000", borderRadius: "2px", padding: "0 0.15em" },
   // Rendered inline HTML tags (Typora-style). Kept inline-editable via mark
   // decorations; the tag markers are hidden while the caret is outside.
   ".cm-html-kbd": {

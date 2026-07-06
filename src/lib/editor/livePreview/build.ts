@@ -2,7 +2,7 @@ import { Decoration, type DecorationSet, type EditorView } from "@codemirror/vie
 import { syntaxTree } from "@codemirror/language";
 import { type Range } from "@codemirror/state";
 import { isElementActive, isLineActive } from "./reveal";
-import { imageBaseDir, revealSimpleSource, inlineMathRender, inlineMathDisplayStyle, renderHtml } from "./config";
+import { imageBaseDir, revealSimpleSource, inlineMathRender, inlineMathDisplayStyle, renderHtml, renderSubscript, renderSuperscript, renderHighlight } from "./config";
 import { scanTagsInLine } from "./tagScan";
 import { resolveHtmlSrc } from "../html/paths";
 import { sanitizeHtml } from "../html/render";
@@ -116,6 +116,11 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
   // Whether embedded HTML renders (markdown.renderHtml). When off, HTML stays as
   // literal source text.
   const htmlOn = state.facet(renderHtml);
+  // Pandoc-style sub/superscript and ==highlight== (markdown.*). When off, the
+  // markers stay literal (like inline math).
+  const subOn = state.facet(renderSubscript);
+  const supOn = state.facet(renderSuperscript);
+  const hlOn = state.facet(renderHighlight);
   // Math blocks rendered idle (by mathField) — the inline-HTML pass skips them.
   const mathBlocks = mathBlockRanges(state);
   const inMathBlock = (pos: number) => mathBlocks.some((r) => pos >= r.from && pos < r.to);
@@ -347,6 +352,14 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
           if (!isElementActive(state, el.from, el.to)) hide(node.from, node.to);
           return;
         }
+        // Pandoc sub/superscript and ==highlight==: hide the markers (gated by the
+        // matching preference) when the caret is outside the element.
+        if (name === "SubscriptMark" || name === "SuperscriptMark" || name === "HighlightMark") {
+          const el = node.node.parent ?? node;
+          const on = el.name === "Subscript" ? subOn : el.name === "Superscript" ? supOn : hlOn;
+          if (on && !isElementActive(state, el.from, el.to)) hide(node.from, node.to);
+          return;
+        }
         if (name === "CodeMark") {
           // Only hide inline-code backticks; leave fenced-code fences visible.
           const parent = node.node.parent;
@@ -362,6 +375,18 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
         }
         if (name === "Strikethrough") {
           mark(node.from, node.to, "cm-md-strike");
+          return;
+        }
+        if (name === "Subscript") {
+          if (subOn) mark(node.from, node.to, "cm-md-sub");
+          return;
+        }
+        if (name === "Superscript") {
+          if (supOn) mark(node.from, node.to, "cm-md-sup");
+          return;
+        }
+        if (name === "Highlight") {
+          if (hlOn) mark(node.from, node.to, "cm-md-highlight");
           return;
         }
 
