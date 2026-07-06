@@ -181,13 +181,52 @@ const EMOJI: Record<string, string> = {
   infinity: "♾️",
 };
 
-const OPTIONS: Completion[] = Object.entries(EMOJI).map(([name, emoji]) => ({
-  label: `:${name}:`,
-  detail: emoji,
-  type: "text",
-  apply: emoji,
-  boost: name.length <= 4 ? 1 : 0,
-}));
+/**
+ * Alternate shortcodes that resolve to a canonical `EMOJI` name — e.g. Typora
+ * maps both `:happy:` and `:smile:` to 😄. Each value must be a key of `EMOJI`.
+ * Aliases are offered in autocomplete and render just like canonical names.
+ */
+const ALIASES: Record<string, string> = {
+  happy: "smile",
+  smiling: "smile",
+  laugh: "laughing",
+  lol: "joy",
+  haha: "joy",
+  mad: "angry",
+  sad: "cry",
+  crying: "sob",
+  thanks: "pray",
+  thankyou: "pray",
+  celebrate: "tada",
+  celebration: "tada",
+  like: "thumbsup",
+  dislike: "thumbsdown",
+  love: "heart",
+  grinning: "grin",
+  idea: "bulb",
+  done: "white_check_mark",
+  tick: "check",
+  cross: "x",
+  clock: "watch",
+  laptop: "computer",
+  note: "memo",
+};
+
+/** Resolve a (lowercased) shortcode through the alias table to a glyph. */
+function glyphFor(name: string): string | undefined {
+  return EMOJI[name] ?? EMOJI[ALIASES[name]];
+}
+
+const OPTIONS: Completion[] = [...Object.keys(EMOJI), ...Object.keys(ALIASES)].map((name) => {
+  const emoji = glyphFor(name)!;
+  return {
+    label: `:${name}:`,
+    detail: emoji,
+    type: "text",
+    apply: emoji,
+    boost: name.length <= 4 ? 1 : 0,
+  };
+});
 
 /**
  * CodeMirror completion source: when the cursor follows a `:name` shortcode,
@@ -210,5 +249,5 @@ export function emojiCompletions(context: CompletionContext): CompletionResult |
  * emoji) and the live-preview renderer (to fetch the glyph). Case-insensitive.
  */
 export function emojiFor(name: string): string | undefined {
-  return EMOJI[name.toLowerCase()];
+  return glyphFor(name.toLowerCase());
 }
