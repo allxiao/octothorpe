@@ -131,6 +131,42 @@ function insertIndentAtCaret(view: EditorView): boolean {
   return true;
 }
 
+/**
+ * Backspace mirrors {@link insertIndentAtCaret}: when every cursor is preceded
+ * by a full run of spaces reaching back to the previous tab stop, delete that
+ * run (unindent by one stop). Otherwise it declines (returns false) so the
+ * default grapheme-safe backspace runs — deleting a single character (or one
+ * emoji/cluster), per "if there's not that many spaces, erase by 1".
+ */
+function backspaceToTabStop(view: EditorView): boolean {
+  const { state } = view;
+  if (state.selection.ranges.some((r) => !r.empty)) return false;
+  const size = state.tabSize;
+  const distTo = (head: number) => {
+    const col = head - state.doc.lineAt(head).from;
+    if (col === 0) return 0; // line start: nothing to unindent here
+    const m = col % size;
+    return m === 0 ? size : m; // spaces back to the previous tab stop (1..size)
+  };
+  // All-or-nothing: only take over when every cursor sits after `dist` spaces.
+  const qualifies = state.selection.ranges.every((r) => {
+    const dist = distTo(r.head);
+    return dist > 0 && state.doc.sliceString(r.head - dist, r.head) === " ".repeat(dist);
+  });
+  if (!qualifies) return false;
+  view.dispatch(
+    state.changeByRange((range) => {
+      const dist = distTo(range.head);
+      return {
+        changes: { from: range.head - dist, to: range.head },
+        range: EditorSelection.cursor(range.head - dist),
+      };
+    }),
+    { scrollIntoView: true, userEvent: "delete.backward" },
+  );
+  return true;
+}
+
 // Table-navigation keys: only consume the key when the caret is in a table (the
 // command returns false otherwise), so they fall through to CodeMirror defaults.
 const TABLE_KEYS: { key: string; id: string }[] = [
@@ -197,6 +233,7 @@ export function baseExtensions(onSave?: () => void): Extension[] {
       },
       { key: "Tab", run: insertIndentAtCaret, shift: indentLess },
       { key: "Backspace", run: codeFenceBackspace },
+      { key: "Backspace", run: backspaceToTabStop },
       { key: "Enter", run: autoMathBlock },
       { key: "Enter", run: autoCodeFence },
       { key: "Enter", run: autoHtmlBlock },
