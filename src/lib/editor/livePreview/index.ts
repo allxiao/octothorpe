@@ -639,8 +639,10 @@ const interactionHandlers = EditorView.domEventHandlers({
   // Links inside rendered HTML are real <a href> elements, so a plain click would
   // navigate the app's own webview (and a mousedown preventDefault can't stop
   // that — navigation fires on `click`). Cancel the native navigation and align
-  // with Markdown links: only Ctrl/Cmd + click opens the target (externally, or
-  // an in-doc jump for `#anchor`); a plain click just places the caret.
+  // with Markdown links: Ctrl/Cmd + click opens the target (externally, or an
+  // in-doc jump for `#anchor`); a plain click enters edit mode, revealing the
+  // rendered HTML's source. The source-reveal happens here (not on mousedown) so
+  // the anchor stays live until the click, keeping preventDefault reliable.
   click(event, view) {
     const a = (event.target as HTMLElement | null)?.closest?.(
       ".cm-md-html-block a[href], .cm-html-inline a[href]",
@@ -652,6 +654,14 @@ const interactionHandlers = EditorView.domEventHandlers({
       if (href) {
         if (href.startsWith("#")) jumpToAnchor(view, href.slice(1));
         else openExternal(href);
+      }
+    } else {
+      // Drop the caret at the start of the rendered HTML so its source reveals
+      // for editing — the same gesture as clicking a Markdown link.
+      const host = a.closest(".cm-html-inline, .cm-md-html-block");
+      if (host) {
+        view.dispatch({ selection: { anchor: view.posAtDOM(host) }, scrollIntoView: true });
+        view.focus();
       }
     }
     return true;
