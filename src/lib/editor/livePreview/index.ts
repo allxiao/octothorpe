@@ -8,7 +8,7 @@ import {
 import type { Extension } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
 import { buildDecorations } from "./build";
-import { onTagClick, revealSimpleSource, inlineMathRender, inlineMathDisplayStyle, renderHtml, renderSubscript, renderSuperscript, renderHighlight } from "./config";
+import { onTagClick, revealSimpleSource, inlineMathRender, inlineMathDisplayStyle, renderHtml, renderSubscript, renderSuperscript, renderHighlight, renderEmoji } from "./config";
 import { tableField } from "./tableField";
 import { mathField } from "./mathField";
 import { htmlBlockField } from "./htmlBlockField";
@@ -125,7 +125,8 @@ class LivePreviewPlugin {
       update.startState.facet(renderHtml) !== update.state.facet(renderHtml) ||
       update.startState.facet(renderSubscript) !== update.state.facet(renderSubscript) ||
       update.startState.facet(renderSuperscript) !== update.state.facet(renderSuperscript) ||
-      update.startState.facet(renderHighlight) !== update.state.facet(renderHighlight)
+      update.startState.facet(renderHighlight) !== update.state.facet(renderHighlight) ||
+      update.startState.facet(renderEmoji) !== update.state.facet(renderEmoji)
     ) {
       const built = buildDecorations(update.view);
       this.decorations = built.decorations;
