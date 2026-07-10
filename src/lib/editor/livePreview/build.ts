@@ -209,16 +209,17 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
 
           codeRanges.push({ from: node.from, to: node.to });
 
-          // ```` ```math ```` is a normal code block while editing, but when idle
-          // it renders as math (via the mathField StateField, which can emit the
-          // block-replace a plugin can't) — like a `$$` block, just without the
-          // hover box/marker. A live preview shows below it while editing.
+          // ```` ```math ```` / ```` ```mermaid ```` are normal code blocks while
+          // editing, but when idle they render (via the mathField / mermaidField
+          // StateFields, which can emit the block-replace a plugin can't). A live
+          // preview shows below them while editing.
           if (
             info &&
-            slice(info.from, info.to).trim() === "math" &&
+            (slice(info.from, info.to).trim() === "math" ||
+              slice(info.from, info.to).trim() === "mermaid") &&
             !isElementActive(state, node.from, node.to)
           ) {
-            return false; // idle: rendered as math by mathField (codeRange recorded)
+            return false; // idle: rendered by mathField / mermaidField (codeRange recorded)
           }
 
           // Structural indent (list/quote nesting) sits before the fence and is

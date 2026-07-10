@@ -31,7 +31,8 @@
     "ajv": "^8.17.1",
     "codemirror": "^6.0.1",
     "dompurify": "^3.4.11",
-    "katex": "^0.17.0"
+    "katex": "^0.17.0",
+    "mermaid": "^11.4.0"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^5.0.0",

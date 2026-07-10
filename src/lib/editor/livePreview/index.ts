@@ -11,6 +11,8 @@ import { buildDecorations } from "./build";
 import { onTagClick, revealSimpleSource, inlineMathRender, inlineMathDisplayStyle, renderHtml, renderSubscript, renderSuperscript, renderHighlight, renderEmoji } from "./config";
 import { tableField } from "./tableField";
 import { mathField } from "./mathField";
+import { mermaidField } from "./mermaidField";
+import { clearMermaidCache, mermaidReadyEffect } from "../mermaid/render";
 import { htmlBlockField } from "./htmlBlockField";
 import { inlineMathTooltipField } from "./mathTooltip";
 import { linkRefsField } from "./linkRefs";
@@ -461,6 +463,45 @@ const livePreviewTheme = EditorView.theme({
     fontSize: "0.85em",
   },
   ".cm-md-math-error": { color: "#e00", fontFamily: "var(--editor-font, monospace)" },
+  // Idle Mermaid render (caret outside a ```mermaid block): the diagram, centered,
+  // click-to-edit. Padding, never margin (CM measures widget height excluding
+  // margins, so a margin desyncs the height map and offsets clicks below).
+  ".cm-md-mermaid-block": {
+    padding: "0.55em 0.8em",
+    overflowX: "auto",
+    textAlign: "center",
+    cursor: "text",
+    borderRadius: "6px",
+    transition: "background 0.1s",
+  },
+  ".cm-md-mermaid-block:hover": {
+    background: "var(--code-block-bg, rgba(135, 131, 120, 0.1))",
+  },
+  // Live preview rendered *below* the editing box (a block widget from the
+  // mermaidField StateField). Padding only, flush against the box.
+  ".cm-md-mermaid-preview": {
+    padding: "0.5em 0 0.6em",
+    overflowX: "auto",
+    textAlign: "center",
+  },
+  ".cm-md-mermaid-preview .cm-widgetBuffer": { display: "none" },
+  ".cm-md-mermaid-block svg, .cm-md-mermaid-preview svg": { maxWidth: "100%", height: "auto" },
+  // Async placeholder shown until the first render lands.
+  ".cm-md-mermaid-loading": {
+    textAlign: "center",
+    color: "var(--text-muted, #999)",
+    fontStyle: "italic",
+    fontFamily: "system-ui, sans-serif",
+    fontSize: "0.85em",
+    padding: "0.8em",
+  },
+  ".cm-md-mermaid-error": {
+    color: "#e00",
+    fontFamily: "var(--editor-font, monospace)",
+    fontSize: "0.85em",
+    whiteSpace: "pre-wrap",
+    padding: "0.5em 0.8em",
+  },
   ".cm-md-link": { color: "#3b82f6", textDecoration: "underline", cursor: "pointer" },
   // A reference link with no matching definition: dashed underline + a small
   // amber "?" marker at its right end.
@@ -727,12 +768,44 @@ const linkStatusPlugin = ViewPlugin.fromClass(
   },
 );
 
+/**
+ * Re-render Mermaid diagrams when the app theme flips (their colors are baked
+ * into the SVG at render time). Watches `data-theme` on <html> and the OS scheme;
+ * on a change it clears the render cache and nudges the mermaidField to rebuild.
+ */
+const mermaidThemePlugin = ViewPlugin.fromClass(
+  class {
+    observer: MutationObserver;
+    media: MediaQueryList | null = null;
+    onMedia: () => void;
+    constructor(view: EditorView) {
+      const refresh = () => {
+        clearMermaidCache();
+        view.dispatch({ effects: mermaidReadyEffect.of(null) });
+      };
+      this.observer = new MutationObserver(refresh);
+      this.observer.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ["data-theme"],
+      });
+      this.onMedia = refresh;
+      this.media = window.matchMedia?.("(prefers-color-scheme: dark)") ?? null;
+      this.media?.addEventListener("change", this.onMedia);
+    }
+    destroy() {
+      this.observer.disconnect();
+      this.media?.removeEventListener("change", this.onMedia);
+    }
+  },
+);
+
 /** The full live-preview extension bundle. */
 export function livePreview(): Extension {
   return [
     linkRefsField,
     tableField,
     mathField,
+    mermaidField,
     htmlBlockField,
     inlineMathTooltipField,
     livePreviewPlugin,
@@ -740,5 +813,6 @@ export function livePreview(): Extension {
     livePreviewTheme,
     interactionHandlers,
     linkStatusPlugin,
+    mermaidThemePlugin,
   ];
 }
