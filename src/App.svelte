@@ -136,7 +136,7 @@
 
 <svelte:window onkeydown={onKeydown} />
 
-<div class="app" style:--editor-max-width={workspace.pageWidthPx + "px"}>
+<div class="app" style:--editor-max-width={workspace.pageWidthCss}>
   <MenuBar />
   <div class="body">
     <ActivityBar />

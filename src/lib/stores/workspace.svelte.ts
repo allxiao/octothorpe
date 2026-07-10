@@ -40,7 +40,7 @@ export interface EditorApi {
   insertTable: (cols: number, rows: number) => void;
 }
 
-export type PageWidth = "normal" | "medium" | "wide";
+export type PageWidth = "normal" | "wide" | "full";
 
 function readPref(key: string, fallback: string): string {
   try {
@@ -58,7 +58,10 @@ function writePref(key: string, value: string) {
 }
 function readPageWidth(): PageWidth {
   const v = readPref("octothorpe:pageWidth", "normal");
-  return v === "medium" || v === "wide" ? v : "normal";
+  if (v === "wide" || v === "full") return v;
+  // Migrate the retired "medium" preset to the (now equivalently-labelled) wide.
+  if (v === "medium") return "wide";
+  return "normal";
 }
 function readSidebarWidth(): number {
   const n = Number(readPref("octothorpe:sidebarWidth", "260"));
@@ -137,8 +140,10 @@ class Workspace {
   sourceMode = $state(readPref("octothorpe:sourceMode", "false") === "true");
   sidebarWidth = $state<number>(readSidebarWidth());
 
-  get pageWidthPx(): number {
-    return this.pageWidth === "wide" ? 1200 : this.pageWidth === "medium" ? 1024 : 860;
+  /** CSS `max-width` for the editor content: a fixed cap for normal/wide, or
+   *  `none` for full (content spans the whole edit area). */
+  get pageWidthCss(): string {
+    return this.pageWidth === "full" ? "none" : this.pageWidth === "wide" ? "1200px" : "860px";
   }
   setPageWidth(w: PageWidth) {
     this.pageWidth = w;

@@ -453,10 +453,10 @@
       </button>
       <button
         class="tb-btn"
-        class:active={workspace.pageWidth === "medium"}
-        title="Medium width"
-        aria-label="Medium width"
-        onclick={() => workspace.setPageWidth("medium")}
+        class:active={workspace.pageWidth === "wide"}
+        title="Wide width"
+        aria-label="Wide width"
+        onclick={() => workspace.setPageWidth("wide")}
       >
         <svg viewBox="0 0 22 16">
           <rect x="1.5" y="2" width="19" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.2" />
@@ -465,10 +465,10 @@
       </button>
       <button
         class="tb-btn"
-        class:active={workspace.pageWidth === "wide"}
-        title="Wide width"
-        aria-label="Wide width"
-        onclick={() => workspace.setPageWidth("wide")}
+        class:active={workspace.pageWidth === "full"}
+        title="Full width"
+        aria-label="Full width"
+        onclick={() => workspace.setPageWidth("full")}
       >
         <svg viewBox="0 0 22 16">
           <rect x="1.5" y="2" width="19" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.2" />
