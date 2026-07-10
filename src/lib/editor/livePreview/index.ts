@@ -14,7 +14,7 @@ import { mathField } from "./mathField";
 import { htmlBlockField } from "./htmlBlockField";
 import { inlineMathTooltipField } from "./mathTooltip";
 import { linkRefsField } from "./linkRefs";
-import { clearActiveTable } from "./TableWidget";
+import { clearActiveTable, tableWidthField } from "./TableWidget";
 import { openUrl } from "../../ipc/commands";
 
 /** Open a URL with the OS default handler (falls back to a tab in the browser). */
@@ -143,6 +143,8 @@ const livePreviewPlugin = ViewPlugin.fromClass(LivePreviewPlugin, {
     EditorView.atomicRanges.of((view) => view.plugin(plugin)?.atomic ?? Decoration.none),
 });
 
+// Apply the persisted table width mode (compact/full) as a class on the editor
+// root so tables pick it up; the toolbar buttons update it via a state effect.
 const livePreviewTheme = EditorView.theme({
   ".cm-md-heading": { fontWeight: "700", lineHeight: "1.25" },
   ".cm-md-h1": { fontSize: "1.9em" },
@@ -524,13 +526,18 @@ const livePreviewTheme = EditorView.theme({
     padding: "0.05em 0.35em",
     cursor: "pointer",
   },
-  ".cm-md-table-wrap": { position: "relative", padding: "0.9em 0 0.4em" },
+  ".cm-md-table-wrap": { position: "relative", padding: "24px 0 0.4em" },
   ".cm-md-table-scroll": { overflowX: "auto" },
   ".cm-md-table": {
     borderCollapse: "collapse",
     fontFamily: "var(--editor-font, monospace)",
     fontSize: "0.9em",
   },
+  // Table width mode (see TableWidget). Full stretches the table to the edit
+  // area and lets `table-layout: auto` distribute the columns; compact sizes to
+  // content. `&` is the editor root, which carries the mode class.
+  "&.cm-tables-full .cm-md-table": { width: "100%" },
+  "&.cm-tables-compact .cm-md-table": { width: "auto" },
   ".cm-md-table th, .cm-md-table td": {
     border: "1px solid var(--border, #ccc)",
     padding: "5px 10px",
@@ -544,7 +551,7 @@ const livePreviewTheme = EditorView.theme({
   },
   ".cm-md-table-toolbar": {
     position: "absolute",
-    top: "-22px",
+    top: "2px",
     left: "0",
     right: "0",
     display: "flex",
@@ -556,7 +563,13 @@ const livePreviewTheme = EditorView.theme({
   },
   ".cm-md-table-wrap:hover .cm-md-table-toolbar, .cm-md-table-wrap:focus-within .cm-md-table-toolbar":
     { opacity: "1", pointerEvents: "auto" },
-  ".cm-md-tb-group": { display: "flex", gap: "2px" },
+  ".cm-md-tb-group": { display: "flex", alignItems: "center", gap: "2px" },
+  ".cm-md-tb-sep": {
+    width: "1px",
+    alignSelf: "stretch",
+    margin: "2px 4px",
+    background: "var(--border, #ccc)",
+  },
   ".cm-md-tb-btn": {
     display: "inline-flex",
     alignItems: "center",
@@ -573,6 +586,13 @@ const livePreviewTheme = EditorView.theme({
   ".cm-md-tb-btn:hover": {
     background: "var(--button-hover-bg, #eee)",
     borderColor: "var(--border, #ccc)",
+  },
+  // Highlight the toolbar button for the active width mode (driven by the
+  // editor-root mode class, so every table's toolbar reflects the shared state).
+  "&.cm-tables-full .cm-md-tb-btn-full, &.cm-tables-compact .cm-md-tb-btn-compact": {
+    background: "var(--button-hover-bg, #eee)",
+    borderColor: "var(--border, #ccc)",
+    color: "var(--accent, #3b82f6)",
   },
   ".cm-md-tb-btn svg": { width: "14px", height: "14px", fill: "currentColor" },
   ".cm-md-table-menu": {
@@ -716,6 +736,7 @@ export function livePreview(): Extension {
     htmlBlockField,
     inlineMathTooltipField,
     livePreviewPlugin,
+    tableWidthField,
     livePreviewTheme,
     interactionHandlers,
     linkStatusPlugin,

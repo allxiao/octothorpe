@@ -1,4 +1,5 @@
-import { WidgetType, type EditorView } from "@codemirror/view";
+import { WidgetType, EditorView } from "@codemirror/view";
+import { StateEffect, StateField, type Extension } from "@codemirror/state";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import {
   parseTableText,
@@ -68,6 +69,48 @@ const MENU_OPS: Record<string, TableOp> = {
   tableDelete: "delete",
 };
 
+// --- Table width mode ("compact" fits content; "full" stretches to the edit
+// area and auto-distributes columns). A single, persisted editor-wide setting
+// (default "full"), reflected as a class on the editor root via CodeMirror's
+// editorAttributes facet (setting `view.dom.className` directly doesn't stick —
+// CM manages that attribute). The per-table toolbar buttons flip this shared
+// mode with an effect.
+export type TableWidthMode = "compact" | "full";
+const TABLE_WIDTH_KEY = "octothorpe:tableWidth";
+
+export function readTableWidthMode(): TableWidthMode {
+  try {
+    return localStorage.getItem(TABLE_WIDTH_KEY) === "compact" ? "compact" : "full";
+  } catch {
+    return "full";
+  }
+}
+
+const setTableWidthEffect = StateEffect.define<TableWidthMode>();
+
+/** Editor-wide table width mode: holds the mode and adds a matching class to the
+ *  editor root so every table's CSS keys off it. Seeded from the saved setting. */
+export const tableWidthField: Extension = StateField.define<TableWidthMode>({
+  create: () => readTableWidthMode(),
+  update(value, tr) {
+    for (const e of tr.effects) if (e.is(setTableWidthEffect)) value = e.value;
+    return value;
+  },
+  provide: (f) =>
+    EditorView.editorAttributes.from(f, (mode) => ({
+      class: mode === "full" ? "cm-tables-full" : "cm-tables-compact",
+    })),
+});
+
+function setTableWidthMode(view: EditorView, mode: TableWidthMode) {
+  try {
+    localStorage.setItem(TABLE_WIDTH_KEY, mode);
+  } catch {
+    // ignore (private mode, etc.)
+  }
+  view.dispatch({ effects: setTableWidthEffect.of(mode) });
+}
+
 /** Text content of a contenteditable cell, normalized to a single line. */
 function cellText(el: HTMLElement): string {
   return (el.textContent ?? "").replace(/ /g, " ").replace(/\s*\n\s*/g, " ");
@@ -93,12 +136,19 @@ const ICONS = {
   alignRight: `<svg viewBox="0 0 14 14"><rect x="1" y="2" width="12" height="1.6"/><rect x="5" y="6.2" width="8" height="1.6"/><rect x="1" y="10.4" width="12" height="1.6"/></svg>`,
   dots: `<svg viewBox="0 0 14 14"><circle cx="7" cy="2.5" r="1.3"/><circle cx="7" cy="7" r="1.3"/><circle cx="7" cy="11.5" r="1.3"/></svg>`,
   trash: `<svg viewBox="0 0 14 14"><path d="M2 3.5h10M5 3.5V2h4v1.5M3 3.5l.7 8.5h6.6L11 3.5" fill="none" stroke="currentColor" stroke-width="1.1"/></svg>`,
+  compact: `<svg viewBox="0 0 14 14"><rect x="3" y="3.5" width="8" height="7" rx="1" fill="none" stroke="currentColor" stroke-width="1.1"/><path d="M7 3.5v7" fill="none" stroke="currentColor" stroke-width="1.1"/></svg>`,
+  full: `<svg viewBox="0 0 14 14"><rect x="1" y="3.5" width="12" height="7" rx="1" fill="none" stroke="currentColor" stroke-width="1.1"/><path d="M7 3.5v7" fill="none" stroke="currentColor" stroke-width="1.1"/></svg>`,
 };
 
 /** A toolbar button that keeps the cell focused (mousedown → preventDefault). */
-function tbButton(html: string, title: string, onClick: () => void): HTMLButtonElement {
+function tbButton(
+  html: string,
+  title: string,
+  onClick: () => void,
+  extraClass = "",
+): HTMLButtonElement {
   const b = document.createElement("button");
-  b.className = "cm-md-tb-btn";
+  b.className = extraClass ? `cm-md-tb-btn ${extraClass}` : "cm-md-tb-btn";
   b.type = "button";
   b.title = title;
   b.innerHTML = html;
@@ -234,11 +284,16 @@ export class TableWidget extends WidgetType {
 
     const left = document.createElement("div");
     left.className = "cm-md-tb-group";
+    const sepEl = document.createElement("div");
+    sepEl.className = "cm-md-tb-sep";
     left.append(
       tbButton(ICONS.grid, "Align default", () => doOp("alignNone")),
       tbButton(ICONS.alignLeft, "Align left", () => doOp("alignLeft")),
       tbButton(ICONS.alignCenter, "Align center", () => doOp("alignCenter")),
       tbButton(ICONS.alignRight, "Align right", () => doOp("alignRight")),
+      sepEl,
+      tbButton(ICONS.compact, "Compact width (fit content)", () => setTableWidthMode(view, "compact"), "cm-md-tb-btn-compact"),
+      tbButton(ICONS.full, "Full width (fit edit area)", () => setTableWidthMode(view, "full"), "cm-md-tb-btn-full"),
     );
 
     const right = document.createElement("div");
