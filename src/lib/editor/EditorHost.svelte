@@ -492,6 +492,13 @@
   .editor :global(.cm-content) {
     max-width: var(--editor-max-width, 860px);
     margin: 0 auto;
-    padding: 24px 16px 40vh;
+    /* Horizontal gutter is split three ways to align a code/math/mermaid block's
+       full-line selection with its text. CodeMirror measures selection edges from
+       the line padding, the box sits at this content padding, and the code text at
+       content+code padding. Aligning selection to code text needs
+       linePad = contentPad + codePad (6+10); keeping ordinary text put needs
+       contentPad + linePad = 22 (6+16). Keep the three (here 6, .cm-line 16,
+       .cm-md-code-block 10) in sync. */
+    padding: 24px 6px 40vh;
   }
 </style>

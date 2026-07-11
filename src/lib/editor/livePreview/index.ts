@@ -150,6 +150,14 @@ const livePreviewPlugin = ViewPlugin.fromClass(LivePreviewPlugin, {
 // Apply the persisted table width mode (compact/full) as a class on the editor
 // root so tables pick it up; the toolbar buttons update it via a state effect.
 const livePreviewTheme = EditorView.theme({
+  // Horizontal line padding (CM default is 6px/2px). Raised to 16px and paired
+  // with a reduced .cm-content padding (6px, see EditorHost) and code-block
+  // padding (10px) so that a code/math/mermaid block's full-line selection edges
+  // — which CodeMirror measures from this line padding — line up exactly with the
+  // block's text (content 6 + code 10 = line 16). Code fences/blocks below
+  // override this with their own padding, so it only governs ordinary lines and
+  // the selection geometry.
+  ".cm-line": { padding: "0 16px" },
   ".cm-md-heading": { fontWeight: "700", lineHeight: "1.25" },
   ".cm-md-h1": { fontSize: "1.9em" },
   ".cm-md-h2": { fontSize: "1.6em" },
@@ -171,10 +179,12 @@ const livePreviewTheme = EditorView.theme({
   },
   // Fenced code block: a box drawn from per-line backgrounds. The code text
   // stays real (natively highlighted) text; the two fence lines collapse away.
+  // 10px horizontal padding — chosen so the full-line selection edge (at the
+  // .cm-line padding) aligns with the code text; see the .cm-line note above.
   ".cm-md-code-block": {
     background: "var(--code-block-bg, rgba(135, 131, 120, 0.1))",
     fontFamily: "var(--editor-font, monospace)",
-    padding: "0 0.8em",
+    padding: "0 10px",
   },
   ".cm-md-code-top": {
     borderTopLeftRadius: "6px",
@@ -437,11 +447,13 @@ const livePreviewTheme = EditorView.theme({
     overflowX: "auto",
   },
   ".cm-md-math-preview .cm-widgetBuffer": { display: "none" },
-  // `$$` editing: the fences stay visible (dimmed); the first boxed line hosts
-  // the top-right "Math" badge.
+  // `$$` editing: the fences stay visible (dimmed); the first boxed line hosts a
+  // top-right "Math" label. Drawn as a ::after pseudo-element (not a widget) so it
+  // stays out of the content flow and never blocks selecting the opening `$$`.
   ".cm-md-math-edit-top": { position: "relative" },
   ".cm-md-math-fence": { opacity: "0.45" },
-  ".cm-md-math-badge": {
+  ".cm-md-math-edit-top::after": {
+    content: '"Math"',
     position: "absolute",
     top: "3px",
     right: "6px",

@@ -132,23 +132,3 @@ export class BlockMathWidget extends WidgetType {
     return Math.ceil(measuredMathHeight(this.latex)) + 18;
   }
 }
-
-/**
- * A small static "Math" badge shown at the top-right of a `$$…$$` block while it
- * is being edited (the `$$` fences stay visible, so this labels the block the way
- * the language picker labels a fenced code block).
- */
-export class MathBadgeWidget extends WidgetType {
-  eq() {
-    return true;
-  }
-  toDOM() {
-    const span = document.createElement("span");
-    span.className = "cm-md-math-badge";
-    span.textContent = "Math";
-    return span;
-  }
-  ignoreEvent() {
-    return true;
-  }
-}

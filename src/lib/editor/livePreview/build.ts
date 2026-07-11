@@ -20,7 +20,7 @@ import {
   CodeLangWidget,
   PlaceholderWidget,
 } from "./widgets";
-import { InlineMathWidget, BlockMathWidget, MathBadgeWidget } from "./mathWidgets";
+import { InlineMathWidget, BlockMathWidget } from "./mathWidgets";
 import { tableRanges } from "./tableField";
 import { resolveLinkRef } from "./linkRefs";
 
@@ -308,7 +308,9 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
           if (first > last) return false;
 
           // Editing: unlike a code block, the `$$` fences stay visible (just
-          // dimmed). Box the whole block; a "Math" badge marks the top-right.
+          // dimmed). Box the whole block; the top-right "Math" label is drawn by a
+          // CSS ::after on cm-md-math-edit-top (a pseudo-element, not a widget, so
+          // it stays out of the content flow and never blocks selecting the `$$`).
           const openMark = marks[0];
           const closeMark = marks[marks.length - 1];
           for (let ln = startLine.number; ln <= endLine.number; ln++) {
@@ -320,9 +322,6 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
           }
           mark(openMark.from, openMark.to, "cm-md-math-fence");
           mark(closeMark.from, closeMark.to, "cm-md-math-fence");
-          decos.push(
-            Decoration.widget({ widget: new MathBadgeWidget(), side: 1 }).range(startLine.from),
-          );
           return false;
         }
 
