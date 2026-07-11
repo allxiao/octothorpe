@@ -3,7 +3,7 @@ import { showTooltip, type Tooltip } from "@codemirror/view";
 import { syntaxTree } from "@codemirror/language";
 import { isElementActive } from "./reveal";
 import { inlineMathRender, inlineMathDisplayStyle } from "./config";
-import { renderInlineMath } from "../math/render";
+import { renderInlineMath, mathRendererEffect } from "../math/render";
 
 /**
  * Typora-style live preview for inline math: while the caret is inside a `$…$`
@@ -51,6 +51,7 @@ export const inlineMathTooltipField = StateField.define<Tooltip | null>({
     if (
       !tr.docChanged &&
       !tr.selection &&
+      !tr.effects.some((e) => e.is(mathRendererEffect)) &&
       tr.startState.facet(inlineMathRender) === tr.state.facet(inlineMathRender) &&
       tr.startState.facet(inlineMathDisplayStyle) === tr.state.facet(inlineMathDisplayStyle)
     ) {

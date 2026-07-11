@@ -13,6 +13,7 @@ import { tableField } from "./tableField";
 import { mathField } from "./mathField";
 import { mermaidField } from "./mermaidField";
 import { clearMermaidCache, mermaidReadyEffect } from "../mermaid/render";
+import { mathRendererEffect } from "../math/render";
 import { htmlBlockField } from "./htmlBlockField";
 import { inlineMathTooltipField } from "./mathTooltip";
 import { linkRefsField } from "./linkRefs";
@@ -128,7 +129,8 @@ class LivePreviewPlugin {
       update.startState.facet(renderSubscript) !== update.state.facet(renderSubscript) ||
       update.startState.facet(renderSuperscript) !== update.state.facet(renderSuperscript) ||
       update.startState.facet(renderHighlight) !== update.state.facet(renderHighlight) ||
-      update.startState.facet(renderEmoji) !== update.state.facet(renderEmoji)
+      update.startState.facet(renderEmoji) !== update.state.facet(renderEmoji) ||
+      update.transactions.some((tr) => tr.effects.some((e) => e.is(mathRendererEffect)))
     ) {
       const built = buildDecorations(update.view);
       this.decorations = built.decorations;

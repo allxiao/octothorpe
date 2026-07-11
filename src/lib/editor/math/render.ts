@@ -1,34 +1,95 @@
 import katex from "katex";
+import { StateEffect } from "@codemirror/state";
 
 /**
- * KaTeX render helper. Synchronous (decoration builds are synchronous) and
+ * Math render helper. Synchronous (decoration builds are synchronous) and
  * memoized so typing only pays for the one node whose LaTeX actually changed —
  * the viewport-scoped decoration builds re-run `renderMath` for every visible
  * math node on each keystroke, but repeated calls with the same input are cache
  * hits. A small FIFO cap keeps the map from growing without bound.
+ *
+ * The engine is switchable at runtime (`setMathRenderer`): KaTeX (default, fast,
+ * bundled) or MathJax (loaded lazily; matches Typora, spaces tall matrices from
+ * real cell height). MathJax can't be reached by a static import here (that would
+ * defeat its lazy chunk), so its render function registers itself via
+ * `registerMathRenderer` once loaded; until then we transparently fall back to
+ * KaTeX.
  */
 const cache = new Map<string, string>();
 const MAX_CACHE = 500;
+
+export type MathRenderer = "katex" | "mathjax";
+let currentRenderer: MathRenderer = "katex";
+/** Set by the lazily-loaded MathJax module once it's ready (see math/mathjax.ts). */
+let mathjaxRenderFn: ((latex: string, displayMode: boolean) => string) | null = null;
+
+/** A "re-render all math now" signal — dispatched when the engine preference
+ *  changes and again once MathJax finishes loading. The math StateFields / live-
+ *  preview plugin rebuild their decorations when a transaction carries it. */
+export const mathRendererEffect = StateEffect.define<null>();
+
+export function setMathRenderer(r: MathRenderer): void {
+  if (r !== currentRenderer) {
+    currentRenderer = r;
+    generation++;
+  }
+}
+
+/** The MathJax module calls this after init to hand us its synchronous SVG
+ *  renderer (inverted dependency: keeps MathJax out of this module's static
+ *  import graph so it stays in its own lazy chunk). */
+export function registerMathRenderer(fn: (latex: string, displayMode: boolean) => string): void {
+  mathjaxRenderFn = fn;
+  generation++; // MathJax now available → previously KaTeX-fallback renders are stale
+}
+
+/** Bumped whenever the effective engine changes (switch, or MathJax finishing
+ *  loading). Math widgets fold this into their `eq` so CodeMirror re-runs `toDOM`
+ *  instead of keeping the previous engine's DOM for an unchanged formula. */
+let generation = 0;
+export function mathRenderGeneration(): number {
+  return generation;
+}
+
+// Matrix/array/cases environments whose rows respect `\arraystretch`.
+const ARRAY_ENV = /\\begin\{(?:[a-zA-Z]*matrix\*?|array|d?cases)\}/;
+// KaTeX (like LaTeX) typesets these rows with almost no gap, so a block full of
+// `\frac`s reads as the rows colliding. A modest default row stretch gives
+// breathing room. Injected only when such an environment is present, and *before*
+// the body so a user's own `\def\arraystretch{…}` still overrides it. KaTeX-only —
+// MathJax sizes rows from real cell height and needs no such tweak.
+const DEFAULT_ARRAY_STRETCH = 1.4;
+
+function withRowSpacing(latex: string): string {
+  return ARRAY_ENV.test(latex)
+    ? `\\def\\arraystretch{${DEFAULT_ARRAY_STRETCH}}` + latex
+    : latex;
+}
 
 function escapeHtml(s: string): string {
   return s.replace(/[&<>]/g, (c) => (c === "&" ? "&amp;" : c === "<" ? "&lt;" : "&gt;"));
 }
 
-/** Render `latex` to an HTML string. Invalid input renders in an error color
- *  (`throwOnError: false`) rather than throwing; the catch is a last resort. */
+/** Render `latex` to an HTML string with the active engine. Invalid input renders
+ *  in an error color rather than throwing; the catch is a last resort. */
 export function renderMath(latex: string, displayMode: boolean): string {
-  const key = (displayMode ? "d\0" : "i\0") + latex;
+  const useMathJax = currentRenderer === "mathjax" && mathjaxRenderFn !== null;
+  // Key by the engine actually used, so KaTeX fallbacks (before MathJax loads)
+  // never poison MathJax entries and vice-versa.
+  const key = (useMathJax ? "m" : "k") + (displayMode ? "d\0" : "i\0") + latex;
   const cached = cache.get(key);
   if (cached !== undefined) return cached;
 
   let html: string;
   try {
-    html = katex.renderToString(latex, {
-      displayMode,
-      throwOnError: false,
-      errorColor: "#e00",
-      output: "html",
-    });
+    html = useMathJax
+      ? mathjaxRenderFn!(latex, displayMode)
+      : katex.renderToString(withRowSpacing(latex), {
+          displayMode,
+          throwOnError: false,
+          errorColor: "#e00",
+          output: "html",
+        });
   } catch {
     html = `<span class="cm-md-math-error">${escapeHtml(latex)}</span>`;
   }

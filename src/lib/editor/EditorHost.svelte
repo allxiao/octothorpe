@@ -9,6 +9,8 @@
   import { livePreview } from "./livePreview";
   import { imageBaseDir, onTagClick, revealSimpleSource, inlineMathRender, inlineMathDisplayStyle, renderHtml, renderSubscript, renderSuperscript, renderHighlight, renderEmoji } from "./livePreview/config";
   import { resolveImageFsPath } from "./livePreview/build";
+  import { setMathRenderer, mathRendererEffect, type MathRenderer } from "./math/render";
+  import { ensureMathJaxLoaded } from "./math/mathjax";
   import { emojiCompletions } from "./emoji";
   import * as ipc from "../ipc/commands";
   import {
@@ -424,6 +426,22 @@
   $effect(() => {
     const on = markdownPrefs.get<boolean>("inlineMathDisplay");
     if (view) view.dispatch({ effects: mathDisplayComp.reconfigure(inlineMathDisplayStyle.of(on)) });
+  });
+
+  // Live-refresh the math engine (markdown.mathRenderer): KaTeX (bundled) or
+  // MathJax (loaded lazily). `setMathRenderer` flips the pure render layer;
+  // `mathRendererEffect` forces every math surface (block field, inline plugin,
+  // tooltip) to re-render. When MathJax is chosen we kick off its one-time load
+  // and re-render again once it's ready — until then math falls back to KaTeX.
+  $effect(() => {
+    const engine = markdownPrefs.get<string>("mathRenderer") as MathRenderer;
+    setMathRenderer(engine);
+    if (view) view.dispatch({ effects: mathRendererEffect.of(null) });
+    if (engine === "mathjax") {
+      void ensureMathJaxLoaded().then(() => {
+        if (view) view.dispatch({ effects: mathRendererEffect.of(null) });
+      });
+    }
   });
 
   // Live-refresh embedded HTML rendering (markdown.renderHtml).

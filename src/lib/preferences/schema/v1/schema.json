@@ -138,6 +138,23 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "mathRenderer": {
+          "type": "string",
+          "default": "katex",
+          "enum": ["katex", "mathjax"],
+          "title": "Math rendering engine",
+          "description": "Engine for $…$, $$…$$ and ```math blocks. MathJax spaces tall matrices (e.g. \\dfrac in a determinant) better; KaTeX is faster and lighter.",
+          "x-ui": {
+            "category": "markdown",
+            "section": "Math",
+            "control": "select",
+            "order": 1,
+            "options": [
+              { "value": "katex", "label": "KaTeX (fast)" },
+              { "value": "mathjax", "label": "MathJax" }
+            ]
+          }
+        },
         "inlineMath": {
           "type": "boolean",
           "default": true,

@@ -1,5 +1,5 @@
 import { WidgetType, type EditorView } from "@codemirror/view";
-import { renderMath, renderInlineMath, measuredMathHeight } from "../math/render";
+import { renderMath, renderInlineMath, measuredMathHeight, mathRenderGeneration } from "../math/render";
 
 /**
  * Inline `$…$` rendered in place of its source. Clicking it drops the caret just
@@ -7,6 +7,8 @@ import { renderMath, renderInlineMath, measuredMathHeight } from "../math/render
  * (the same gesture the image/link widgets use).
  */
 export class InlineMathWidget extends WidgetType {
+  // Folded into `eq` so a math-engine switch re-renders (see mathRenderGeneration).
+  readonly gen = mathRenderGeneration();
   constructor(
     readonly latex: string,
     readonly from: number,
@@ -18,7 +20,8 @@ export class InlineMathWidget extends WidgetType {
     return (
       other.latex === this.latex &&
       other.from === this.from &&
-      other.displaystyle === this.displaystyle
+      other.displaystyle === this.displaystyle &&
+      other.gen === this.gen
     );
   }
   toDOM(view: EditorView) {
@@ -49,6 +52,8 @@ export class InlineMathWidget extends WidgetType {
  * but doesn't churn when unrelated text changes.
  */
 export class BlockMathWidget extends WidgetType {
+  // Folded into `eq` so a math-engine switch re-renders (see mathRenderGeneration).
+  readonly gen = mathRenderGeneration();
   constructor(
     readonly latex: string,
     readonly enterPos = -1,
@@ -64,7 +69,8 @@ export class BlockMathWidget extends WidgetType {
       other.enterPos === this.enterPos &&
       other.insertLine === this.insertLine &&
       other.hoverable === this.hoverable &&
-      other.previewCaret === this.previewCaret
+      other.previewCaret === this.previewCaret &&
+      other.gen === this.gen
     );
   }
   toDOM(view: EditorView) {

@@ -3,6 +3,7 @@ import { Decoration, type DecorationSet, EditorView } from "@codemirror/view";
 import { syntaxTree } from "@codemirror/language";
 import { isElementActive } from "./reveal";
 import { BlockMathWidget } from "./mathWidgets";
+import { mathRendererEffect } from "../math/render";
 
 interface MathDecos {
   /** All math block decorations (idle renders + editing previews). */
@@ -119,9 +120,12 @@ function build(state: EditorState): MathDecos {
 export const mathField = StateField.define<MathDecos>({
   create: (state) => build(state),
   // Rebuild on edits and on caret moves (the caret entering/leaving a block
-  // toggles between the rendered form and the editable box).
+  // toggles between the rendered form and the editable box), and when the math
+  // engine changes / finishes loading (mathRendererEffect).
   update(value, tr) {
-    return tr.docChanged || tr.selection ? build(tr.state) : value;
+    return tr.docChanged || tr.selection || tr.effects.some((e) => e.is(mathRendererEffect))
+      ? build(tr.state)
+      : value;
   },
   provide: (f) => [
     EditorView.decorations.from(f, (v) => v.all),
