@@ -8,7 +8,7 @@ import {
 import type { Extension } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
 import { buildDecorations } from "./build";
-import { onTagClick, revealSimpleSource, inlineMathRender, inlineMathDisplayStyle, renderHtml, renderSubscript, renderSuperscript, renderHighlight, renderEmoji } from "./config";
+import { onTagClick, revealSimpleSource, inlineMathRender, inlineMathDisplayStyle, renderHtml, renderSubscript, renderSuperscript, renderHighlight, renderEmoji, renderFootnotes } from "./config";
 import { tableField } from "./tableField";
 import { mathField } from "./mathField";
 import { mermaidField } from "./mermaidField";
@@ -17,6 +17,7 @@ import { mathRendererEffect } from "../math/render";
 import { htmlBlockField } from "./htmlBlockField";
 import { inlineMathTooltipField } from "./mathTooltip";
 import { linkRefsField } from "./linkRefs";
+import { footnotesField, footnoteHover } from "./footnotes";
 import { clearActiveTable, tableWidthField } from "./TableWidget";
 import { openUrl } from "../../ipc/commands";
 
@@ -130,6 +131,7 @@ class LivePreviewPlugin {
       update.startState.facet(renderSuperscript) !== update.state.facet(renderSuperscript) ||
       update.startState.facet(renderHighlight) !== update.state.facet(renderHighlight) ||
       update.startState.facet(renderEmoji) !== update.state.facet(renderEmoji) ||
+      update.startState.facet(renderFootnotes) !== update.state.facet(renderFootnotes) ||
       update.transactions.some((tr) => tr.effects.some((e) => e.is(mathRendererEffect)))
     ) {
       const built = buildDecorations(update.view);
@@ -276,6 +278,45 @@ export const livePreviewTheme = EditorView.theme({
   // Emoji rendered from a `:name:` shortcode. Inline-block so the atomic replace
   // widget sits on the text baseline; keep the default (non-monospace) font.
   ".cm-md-emoji": { display: "inline-block", fontFamily: "initial", fontStyle: "normal" },
+  // Footnote reference `[^label]` → a small superscript pill with a rounded gray
+  // box (Typora/GitHub style). Missing-definition references turn amber.
+  ".cm-md-footnote-ref": {
+    verticalAlign: "super",
+    fontSize: "0.7em",
+    fontWeight: "600",
+    lineHeight: "0",
+    padding: "0.15em 0.45em",
+    margin: "0 0.1em",
+    borderRadius: "5px",
+    background: "rgba(135, 131, 120, 0.2)",
+    color: "var(--text, #333)",
+    fontFamily: "system-ui, sans-serif",
+    whiteSpace: "nowrap",
+    cursor: "pointer",
+  },
+  ".cm-md-footnote-ref:hover": { background: "rgba(135, 131, 120, 0.34)" },
+  ".cm-md-footnote-ref-missing": {
+    color: "#f59e0b",
+    background: "rgba(245, 158, 11, 0.16)",
+  },
+  ".cm-md-footnote-ref-missing:hover": { background: "rgba(245, 158, 11, 0.28)" },
+  // Definition marker `[^label]:` — dimmed so the content reads as the note body.
+  ".cm-md-footnote-def": { opacity: "0.5" },
+  // Hover preview of a footnote's definition (a dark rounded card). Below the
+  // app's modals (100), like the math tooltip.
+  ".cm-md-footnote-tooltip": {
+    zIndex: "40 !important",
+    maxWidth: "360px",
+    padding: "0.4em 0.7em",
+    borderRadius: "6px",
+    background: "var(--tooltip-bg, #1f2430)",
+    color: "var(--tooltip-fg, #f5f5f5)",
+    boxShadow: "0 2px 12px rgba(0, 0, 0, 0.35)",
+    fontSize: "0.9em",
+    lineHeight: "1.45",
+    overflowWrap: "break-word",
+  },
+  ".cm-md-footnote-tooltip-missing": { fontStyle: "italic", opacity: "0.85" },
   // Rendered inline HTML tags (Typora-style). Kept inline-editable via mark
   // decorations; the tag markers are hidden while the caret is outside.
   ".cm-html-kbd": {
@@ -821,11 +862,13 @@ const mermaidThemePlugin = ViewPlugin.fromClass(
 export function livePreview(): Extension {
   return [
     linkRefsField,
+    footnotesField,
     tableField,
     mathField,
     mermaidField,
     htmlBlockField,
     inlineMathTooltipField,
+    footnoteHover,
     livePreviewPlugin,
     tableWidthField,
     livePreviewTheme,

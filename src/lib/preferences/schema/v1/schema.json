@@ -197,6 +197,13 @@
           "description": "Render :name: shortcodes as emoji (e.g. :smile: as 😄).",
           "x-ui": { "category": "markdown", "section": "Syntax Support", "control": "toggle", "order": 6 }
         },
+        "footnotes": {
+          "type": "boolean",
+          "default": true,
+          "title": "Footnotes",
+          "description": "Render footnote references [^label] as superscript pills with a hover preview of their definition ([^label]: …). When off, both stay literal source text.",
+          "x-ui": { "category": "markdown", "section": "Syntax Support", "control": "toggle", "order": 7 }
+        },
         "renderHtml": {
           "type": "boolean",
           "default": true,

@@ -90,3 +90,45 @@ export const Emoji: MarkdownConfig = {
     },
   ],
 };
+
+/**
+ * Footnote reference (`[^label]`). A self-contained inline token — on `[^`, scan
+ * a run of label characters (no whitespace, no brackets) to the closing `]` and
+ * emit a `FootnoteReference` node. Runs `before: "Link"` so `[^…]` is captured as
+ * a footnote rather than swallowed by the link parser.
+ *
+ * The definition marker `[^label]:` also produces this node (it's parsed as inline
+ * content on a paragraph line); the live-preview builder tells the two apart by
+ * position (a marker sits at line start and is immediately followed by `:`) and
+ * renders the definition line specially. See [livePreview/footnotes.ts].
+ */
+export const Footnote: MarkdownConfig = {
+  defineNodes: [{ name: "FootnoteReference", style: tags.labelName }],
+  parseInline: [
+    {
+      name: "FootnoteReference",
+      parse(cx: InlineContext, next: number, pos: number): number {
+        // `[^` opener.
+        if (next !== 91 /* '[' */ || cx.char(pos + 1) !== 94 /* '^' */) return -1;
+        // Label: one or more chars up to `]`, excluding whitespace and brackets.
+        let end = pos + 2;
+        const max = cx.end;
+        for (; end < max; end++) {
+          const c = cx.char(end);
+          if (c === 93 /* ']' */) break;
+          if (
+            c === 91 /* '[' */ ||
+            c === 32 /* space */ ||
+            c === 9 /* tab */ ||
+            c === 10 /* \n */ ||
+            c === 13 /* \r */
+          )
+            return -1;
+        }
+        if (end === pos + 2 || cx.char(end) !== 93 /* empty label / no closing ']' */) return -1;
+        return cx.addElement(cx.elt("FootnoteReference", pos, end + 1));
+      },
+      before: "Link",
+    },
+  ],
+};

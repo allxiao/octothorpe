@@ -2,7 +2,7 @@ import { Decoration, type DecorationSet, type EditorView } from "@codemirror/vie
 import { syntaxTree } from "@codemirror/language";
 import { type Range } from "@codemirror/state";
 import { isElementActive, isLineActive } from "./reveal";
-import { imageBaseDir, revealSimpleSource, inlineMathRender, inlineMathDisplayStyle, renderHtml, renderSubscript, renderSuperscript, renderHighlight, renderEmoji, inlineOnly } from "./config";
+import { imageBaseDir, revealSimpleSource, inlineMathRender, inlineMathDisplayStyle, renderHtml, renderSubscript, renderSuperscript, renderHighlight, renderEmoji, renderFootnotes, inlineOnly } from "./config";
 import { scanTagsInLine } from "./tagScan";
 import { resolveHtmlSrc } from "../html/paths";
 import { sanitizeHtml } from "../html/render";
@@ -23,6 +23,8 @@ import {
 import { InlineMathWidget, BlockMathWidget } from "./mathWidgets";
 import { tableRanges } from "./tableField";
 import { resolveLinkRef } from "./linkRefs";
+import { FootnoteRefWidget } from "./footnoteWidget";
+import { FOOTNOTE_DEF_RE, resolveFootnote, isFootnoteDefMarker } from "./footnotes";
 
 /**
  * Resolve a Markdown image URL to something the webview can load. Shared with the
@@ -77,7 +79,14 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
   const replaceWith = (
     from: number,
     to: number,
-    w: ImageWidget | HrWidget | BulletWidget | CheckboxWidget | InlineHtmlWidget | EmojiWidget,
+    w:
+      | ImageWidget
+      | HrWidget
+      | BulletWidget
+      | CheckboxWidget
+      | InlineHtmlWidget
+      | EmojiWidget
+      | FootnoteRefWidget,
   ) => {
     const d = Decoration.replace({ widget: w }).range(from, to);
     decos.push(d);
@@ -135,6 +144,9 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
   const hlOn = state.facet(renderHighlight);
   // Whether `:name:` shortcodes render as emoji glyphs (markdown.emoji).
   const emojiOn = state.facet(renderEmoji);
+  // Whether footnote references render as pills and definition lines get a dim
+  // marker (markdown.footnotes). When off, both stay literal source text.
+  const footnotesOn = state.facet(renderFootnotes);
   // Math blocks rendered idle (by mathField) — the inline-HTML pass skips them.
   const mathBlocks = mathBlockRanges(state);
   const inMathBlock = (pos: number) => mathBlocks.some((r) => pos >= r.from && pos < r.to);
@@ -417,6 +429,21 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
           return;
         }
 
+        // --- Footnote reference (`[^label]`): replace with a superscript pill,
+        //     revealing the raw source while the caret is inside it. A reference
+        //     with no definition is flagged (styled + tooltip hint) so Ctrl+click
+        //     can scaffold one. The `[^label]` at the head of a definition line is
+        //     a marker, not a reference — leave it to the definition-line pass. ---
+        if (name === "FootnoteReference") {
+          if (footnotesOn && !inlineMode && !isFootnoteDefMarker(state, node.from, node.to) &&
+              !isElementActive(state, node.from, node.to)) {
+            const label = slice(node.from + 2, node.to - 1);
+            const hasDef = !!resolveFootnote(state, label);
+            replaceWith(node.from, node.to, new FootnoteRefWidget(label, node.from, hasDef));
+          }
+          return false; // never descend into the `[^ … ]` marks
+        }
+
         // --- Links: inline `[text](url)`, angle `[text](<url with space>)`, a
         //     lenient `[text](url with space)` (unbracketed spaces — common in
         //     file-path URLs, not strict CommonMark), and reference `[text][id]`.
@@ -650,6 +677,19 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
     for (; !inlineMode && ln <= lastLn; ln++) {
       const line = state.doc.line(ln);
       if (inTable(line.from) || inCode(line.from) || inHtmlBlock(line.from) || inHtmlRegion(line.from)) continue;
+      // Footnote definition line (`[^label]: …`): dim the `[^label]:` marker; the
+      // content already rendered as normal inline Markdown in the tree walk above.
+      // Checked before the link-def branch because `[^label]:` also matches
+      // LINK_DEF_RE — and always consumes the line so it never mis-renders as one.
+      const fdef = FOOTNOTE_DEF_RE.exec(line.text);
+      if (fdef) {
+        if (footnotesOn) {
+          const markerFrom = line.from + fdef[1].length;
+          const markerTo = markerFrom + 2 + fdef[2].length + 2; // `[^` + label + `]:`
+          mark(markerFrom, markerTo, "cm-md-footnote-def");
+        }
+        continue;
+      }
       // Link reference definition line — styled, with placeholders for empty
       // URL/title. (Handled here, not in the tree walk, because an empty
       // `[id]:` isn't a LinkReference node.) Such lines carry no tags.

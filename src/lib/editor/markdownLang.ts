@@ -7,7 +7,7 @@ import { parseMixed } from "@lezer/common";
 import { mathMarkdown } from "./math/mathMarkdown";
 import { mathLanguage } from "./math/lang";
 import { mermaidLanguage } from "./mermaid/lang";
-import { Highlight, Emoji } from "./markdownExtensions";
+import { Highlight, Emoji, Footnote } from "./markdownExtensions";
 
 /**
  * Overlay the LaTeX highlighter on the *content* of `$…$` / `$$ … $$` nodes (the
@@ -38,7 +38,7 @@ const mathNesting: MarkdownConfig = {
  * `mathNesting` (a highlighting-only overlay) on top; the cell renderer doesn't
  * need it (it reads `InlineMath` text directly).
  */
-export const MD_EXTENSIONS = [GFM, mathMarkdown, Subscript, Superscript, Highlight, Emoji];
+export const MD_EXTENSIONS = [GFM, mathMarkdown, Subscript, Superscript, Highlight, Emoji, Footnote];
 
 /**
  * Markdown language support driven by the incremental, error-tolerant Lezer

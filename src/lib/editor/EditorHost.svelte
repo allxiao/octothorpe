@@ -7,7 +7,7 @@
   import { closeBrackets, closeBracketsKeymap, autocompletion } from "@codemirror/autocomplete";
   import { baseExtensions } from "./setup";
   import { livePreview } from "./livePreview";
-  import { imageBaseDir, onTagClick, revealSimpleSource, inlineMathRender, inlineMathDisplayStyle, renderHtml, renderSubscript, renderSuperscript, renderHighlight, renderEmoji } from "./livePreview/config";
+  import { imageBaseDir, onTagClick, revealSimpleSource, inlineMathRender, inlineMathDisplayStyle, renderHtml, renderSubscript, renderSuperscript, renderHighlight, renderEmoji, renderFootnotes } from "./livePreview/config";
   import { resolveImageFsPath } from "./livePreview/build";
   import { setMathRenderer, mathRendererEffect, type MathRenderer } from "./math/render";
   import { ensureMathJaxLoaded } from "./math/mathjax";
@@ -72,6 +72,8 @@
   const highlightComp = new Compartment();
   // Emoji shortcode rendering (markdown.emoji).
   const emojiComp = new Compartment();
+  // Footnote rendering (markdown.footnotes).
+  const footnoteComp = new Compartment();
   // Spell-check content attribute (editor.spellCheck).
   const spellComp = new Compartment();
 
@@ -279,6 +281,7 @@
         supComp.of(renderSuperscript.of(markdownPrefs.get<boolean>("superscript"))),
         highlightComp.of(renderHighlight.of(markdownPrefs.get<boolean>("highlight"))),
         emojiComp.of(renderEmoji.of(markdownPrefs.get<boolean>("emoji"))),
+        footnoteComp.of(renderFootnotes.of(markdownPrefs.get<boolean>("footnotes"))),
         spellComp.of(spellAttrs()),
         // Copy/cut behavior (editor.copyWholeLine / copyMarkdownAsPlain). Only
         // intercept when a preference diverges from CodeMirror's native default.
@@ -468,6 +471,10 @@
   $effect(() => {
     const on = markdownPrefs.get<boolean>("emoji");
     if (view) view.dispatch({ effects: emojiComp.reconfigure(renderEmoji.of(on)) });
+  });
+  $effect(() => {
+    const on = markdownPrefs.get<boolean>("footnotes");
+    if (view) view.dispatch({ effects: footnoteComp.reconfigure(renderFootnotes.of(on)) });
   });
 
   // Live-refresh the spell-check content attribute.

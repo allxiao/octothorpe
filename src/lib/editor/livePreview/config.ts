@@ -74,6 +74,16 @@ export const renderEmoji = Facet.define<boolean, boolean>({
 });
 
 /**
+ * Whether footnote references (`[^label]`) render as superscript pills (with a
+ * hover preview of their definition) and definition lines (`[^label]: …`) get a
+ * dimmed marker. Driven by the `markdown.footnotes` preference; default true.
+ * When off, both stay literal source text.
+ */
+export const renderFootnotes = Facet.define<boolean, boolean>({
+  combine: (values) => (values.length ? values[values.length - 1] : true),
+});
+
+/**
  * When true, the live-preview decoration builder renders only *inline* Markdown
  * (bold, code, links, `$…$` math, emoji, sub/sup/highlight …) and treats every
  * block construct (headings, lists, quotes, rules, fenced code, block math) as
