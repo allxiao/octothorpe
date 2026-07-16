@@ -686,7 +686,17 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
         if (footnotesOn) {
           const markerFrom = line.from + fdef[1].length;
           const markerTo = markerFrom + 2 + fdef[2].length + 2; // `[^` + label + `]:`
-          mark(markerFrom, markerTo, "cm-md-footnote-def");
+          // The marker carries the label so Ctrl+click can jump to the first
+          // body reference (the reverse of a reference's jump-to-definition).
+          decos.push(
+            Decoration.mark({
+              class: "cm-md-footnote-def",
+              attributes: {
+                "data-label": fdef[2],
+                title: "Ctrl-click to jump to the first reference",
+              },
+            }).range(markerFrom, markerTo),
+          );
         }
         continue;
       }

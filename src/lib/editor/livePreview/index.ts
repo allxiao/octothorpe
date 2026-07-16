@@ -17,7 +17,7 @@ import { mathRendererEffect } from "../math/render";
 import { htmlBlockField } from "./htmlBlockField";
 import { inlineMathTooltipField } from "./mathTooltip";
 import { linkRefsField } from "./linkRefs";
-import { footnotesField, footnoteHover } from "./footnotes";
+import { footnotesField, footnoteHover, firstFootnoteReferencePos } from "./footnotes";
 import { clearActiveTable, tableWidthField } from "./TableWidget";
 import { openUrl } from "../../ipc/commands";
 
@@ -746,6 +746,24 @@ const interactionHandlers = EditorView.domEventHandlers({
       if (missing != null) {
         event.preventDefault();
         createOrGotoDef(view, missing);
+        return true;
+      }
+    }
+    // Ctrl/Cmd + click on a footnote definition marker jumps to the first body
+    // reference of that footnote (the reverse of a reference's jump-to-def).
+    const fdef = target?.closest?.(".cm-md-footnote-def");
+    if (fdef && (event.ctrlKey || event.metaKey)) {
+      const label = fdef.getAttribute("data-label");
+      if (label) {
+        event.preventDefault();
+        const pos = firstFootnoteReferencePos(view.state, label);
+        if (pos != null) {
+          view.focus();
+          view.dispatch({
+            selection: { anchor: pos },
+            effects: EditorView.scrollIntoView(pos, { y: "center" }),
+          });
+        }
         return true;
       }
     }

@@ -69,6 +69,30 @@ export function resolveFootnote(state: EditorState, label: string): Footnote | u
 }
 
 /**
+ * Document position of the *first* body reference (`[^label]`) for a label, or
+ * null when the label is only ever defined and never referenced. Definition
+ * markers are skipped so a jump lands on a real in-prose reference.
+ */
+export function firstFootnoteReferencePos(state: EditorState, label: string): number | null {
+  const key = normalizeFootnote(label);
+  let pos: number | null = null;
+  syntaxTree(state).iterate({
+    enter: (node) => {
+      if (pos !== null) return false;
+      if (
+        node.name === "FootnoteReference" &&
+        !isFootnoteDefMarker(state, node.from, node.to) &&
+        normalizeFootnote(state.doc.sliceString(node.from + 2, node.to - 1)) === key
+      ) {
+        pos = node.from;
+      }
+      return undefined;
+    },
+  });
+  return pos;
+}
+
+/**
  * Whether a `FootnoteReference` node is actually a definition *marker* — the
  * `[^label]` at the start of a `[^label]: …` line (nothing but indentation before
  * it, a colon right after). Such markers are rendered by the definition-line pass,
