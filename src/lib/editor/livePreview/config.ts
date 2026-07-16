@@ -72,3 +72,15 @@ export const renderHighlight = Facet.define<boolean, boolean>({
 export const renderEmoji = Facet.define<boolean, boolean>({
   combine: (values) => (values.length ? values[values.length - 1] : true),
 });
+
+/**
+ * When true, the live-preview decoration builder renders only *inline* Markdown
+ * (bold, code, links, `$…$` math, emoji, sub/sup/highlight …) and treats every
+ * block construct (headings, lists, quotes, rules, fenced code, block math) as
+ * literal text. Set for the nested single-line editor used inside table cells, so
+ * a leading `#`/`-`/`>` stays literal like GFM's inline-only cell semantics.
+ * Defaults to false (the main document renders blocks normally).
+ */
+export const inlineOnly = Facet.define<boolean, boolean>({
+  combine: (values) => (values.length ? values[values.length - 1] : false),
+});

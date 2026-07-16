@@ -2,12 +2,12 @@ import { Decoration, type DecorationSet, type EditorView } from "@codemirror/vie
 import { syntaxTree } from "@codemirror/language";
 import { type Range } from "@codemirror/state";
 import { isElementActive, isLineActive } from "./reveal";
-import { imageBaseDir, revealSimpleSource, inlineMathRender, inlineMathDisplayStyle, renderHtml, renderSubscript, renderSuperscript, renderHighlight, renderEmoji } from "./config";
+import { imageBaseDir, revealSimpleSource, inlineMathRender, inlineMathDisplayStyle, renderHtml, renderSubscript, renderSuperscript, renderHighlight, renderEmoji, inlineOnly } from "./config";
 import { scanTagsInLine } from "./tagScan";
 import { resolveHtmlSrc } from "../html/paths";
 import { sanitizeHtml } from "../html/render";
 import { collectInlineHtml } from "./inlineHtml";
-import { InlineHtmlWidget } from "./htmlWidgets";
+import { InlineHtmlWidget, BreakWidget } from "./htmlWidgets";
 import { EmojiWidget } from "./emojiWidget";
 import { emojiFor } from "../emoji";
 import { mathBlockRanges } from "./mathField";
@@ -50,6 +50,12 @@ export interface BuiltDecorations {
   /** Subset (replaced spans only) marked atomic so the cursor steps over them. */
   atomic: DecorationSet;
 }
+
+/** Block-construct node names skipped in `inlineOnly` mode so their source stays
+ *  literal (headings, quotes, lists, rules, fenced code, block math). */
+const BLOCK_ONLY_NODES =
+  /^(?:(?:ATX|Setext)Heading[1-6]|HeaderMark|Blockquote|QuoteMark|ListMark|TaskMarker|HorizontalRule|FencedCode|BlockMath)$/;
+
 
 /**
  * Walk the Lezer syntax tree over the visible ranges only (for performance) and
@@ -94,6 +100,10 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
   const inlineMathOn = state.facet(inlineMathRender);
   // Whether inline math renders in display style (markdown.inlineMathDisplay).
   const inlineMathDisplay = state.facet(inlineMathDisplayStyle);
+  // Cell/single-line mode: render only inline Markdown; block markers (#, -, >,
+  // ---, task/list, fenced code, block math) stay literal. Set for the nested
+  // table-cell editor.
+  const inlineMode = state.facet(inlineOnly);
 
   // Tables are rendered as editable block widgets (via a StateField); skip any
   // inline decoration inside them.
@@ -183,6 +193,10 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
       enter: (node) => {
         if (inTable(node.from)) return false;
         const name = node.name;
+
+        // Inline-only mode (table cells): treat block constructs as literal — skip
+        // their decoration but descend so any inline content inside still renders.
+        if (inlineMode && BLOCK_ONLY_NODES.test(name)) return undefined;
 
         // Embedded HTML is handled separately: block HTML (`HTMLBlock`,
         // `CommentBlock`) by the htmlBlockField StateField, inline HTML
@@ -403,56 +417,90 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
           return;
         }
 
-        // --- Links: inline `[text](url)` and reference `[text][id]` /
-        //     `[text][]`. The rendered text carries the resolved URL (Ctrl/Cmd+
-        //     click) and any title. A reference whose definition is missing is
-        //     still rendered as a link, flagged with `data-missing` so Ctrl+click
-        //     can scaffold the definition. ---
+        // --- Links: inline `[text](url)`, angle `[text](<url with space>)`, a
+        //     lenient `[text](url with space)` (unbracketed spaces — common in
+        //     file-path URLs, not strict CommonMark), and reference `[text][id]`.
+        //     The rendered text carries the resolved URL (Ctrl/Cmd+click) and any
+        //     title. A reference whose definition is missing is still rendered,
+        //     flagged with `data-missing` so Ctrl+click can scaffold it. ---
         if (name === "Link") {
-          // Record the span so a `#anchor` inside it isn't scanned as a tag,
-          // even while the link's raw source is revealed for editing.
           linkRanges.push({ from: node.from, to: node.to });
+          const marks = node.node.getChildren("LinkMark");
+          const textStart = node.from + 1;
+          const textEnd = marks.length >= 2 ? marks[1].from : node.to;
+          const cls = "cm-md-link";
+
+          const renderLink = (
+            to: number,
+            attributes: Record<string, string>,
+            extraClass = "",
+          ) => {
+            hide(node.from, textStart); // '['
+            hide(textEnd, to); // '](url)' / '][id]'
+            decos.push(
+              Decoration.mark({ class: extraClass ? `${cls} ${extraClass}` : cls, attributes }).range(
+                textStart,
+                textEnd,
+              ),
+            );
+          };
+
+          const urlNode = node.node.getChild("URL");
+          if (urlNode) {
+            // Inline link. Use the parsed URL node (robust for `<…>` destinations
+            // that can contain spaces) rather than a brittle whole-node regex.
+            if (!isElementActive(state, node.from, node.to)) {
+              const url = slice(urlNode.from, urlNode.to).replace(/^<([\s\S]*)>$/, "$1").trim();
+              const attributes: Record<string, string> = { "data-href": url };
+              const tm = /"([^"]*)"/.exec(slice(urlNode.to, node.to)); // optional title
+              if (tm) attributes.title = tm[1];
+              renderLink(node.to, attributes);
+            }
+            return;
+          }
+
+          // No URL child: a bare `[text]`. Lenient inline form — `[text]` directly
+          // followed by a `(destination)` whose URL may contain spaces (the space
+          // otherwise ends the destination in CommonMark). One bracket pair only.
+          const lineTo = state.doc.lineAt(node.to).to;
+          const lenient =
+            marks.length === 2 ? /^\(\s*([^)]+?)\s*\)/.exec(slice(node.to, lineTo)) : null;
+          if (lenient) {
+            const fullTo = node.to + lenient[0].length;
+            linkRanges.push({ from: node.from, to: fullTo });
+            if (!isElementActive(state, node.from, fullTo)) {
+              let dest = lenient[1];
+              const attributes: Record<string, string> = {};
+              const tm = /^([\s\S]*?)\s+"([^"]*)"$/.exec(dest); // optional trailing title
+              if (tm) {
+                dest = tm[1];
+                attributes.title = tm[2];
+              }
+              attributes["data-href"] = dest.replace(/^<([\s\S]*)>$/, "$1").trim();
+              renderLink(fullTo, attributes);
+            }
+            return;
+          }
+
+          // Reference link `[text][id]` / `[text][]`.
           if (!isElementActive(state, node.from, node.to)) {
-            const raw = slice(node.from, node.to);
-            const inline = /^\[([^\]]*)\]\(\s*(\S+?)(?:\s+"([^"]*)")?\s*\)$/.exec(raw);
-            if (inline) {
-              const textStart = node.from + 1;
-              const textEnd = textStart + inline[1].length;
-              hide(node.from, textStart); // '['
-              hide(textEnd, node.to); // '](url)'
-              const attributes: Record<string, string> = { "data-href": inline[2] };
-              if (inline[3]) attributes.title = inline[3];
-              decos.push(
-                Decoration.mark({ class: "cm-md-link", attributes }).range(textStart, textEnd),
-              );
-            } else {
-              // Full reference `[text][id]` or implicit `[text][]`.
-              const ref = /^\[([^\]]*)\]\[([^\]]*)\]$/.exec(raw);
-              if (ref) {
-                const text = ref[1];
-                const label = ref[2].trim() ? ref[2] : text;
-                const resolved = resolveLinkRef(state, label);
-                const textStart = node.from + 1;
-                const textEnd = textStart + text.length;
-                hide(node.from, textStart); // '['
-                hide(textEnd, node.to); // '][id]'
-                if (resolved) {
-                  const attributes: Record<string, string> = { "data-href": resolved.url };
-                  if (resolved.title) attributes.title = resolved.title;
-                  decos.push(
-                    Decoration.mark({ class: "cm-md-link", attributes }).range(textStart, textEnd),
-                  );
-                } else {
-                  decos.push(
-                    Decoration.mark({
-                      class: "cm-md-link cm-md-link-missing",
-                      attributes: {
-                        "data-missing": label,
-                        title: "Missing link reference — Ctrl-click to add a definition",
-                      },
-                    }).range(textStart, textEnd),
-                  );
-                }
+            const ref = /^\[([^\]]*)\]\[([^\]]*)\]$/.exec(slice(node.from, node.to));
+            if (ref) {
+              const label = ref[2].trim() ? ref[2] : ref[1];
+              const resolved = resolveLinkRef(state, label);
+              if (resolved) {
+                const attributes: Record<string, string> = { "data-href": resolved.url };
+                if (resolved.title) attributes.title = resolved.title;
+                renderLink(node.to, attributes);
+              } else {
+                renderLink(
+                  node.to,
+                  {
+                    "data-missing": label,
+                    title: "Missing link reference — Ctrl-click to add a definition",
+                  },
+                  "cm-md-link-missing",
+                );
               }
             }
           }
@@ -584,6 +632,9 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
             replaceWith(op.from, op.to, new ImageWidget(src, op.alt, op.from, op.to, "inline"));
           }
           // Unresolvable src → leave the raw source visible.
+        } else if (op.kind === "break") {
+          // Keep a `<br>`'s line break while its raw source is revealed for editing.
+          decos.push(Decoration.widget({ widget: new BreakWidget(), side: 1 }).range(op.pos));
         } else {
           // op.kind === "widget": render sanitized inline HTML, click-to-edit.
           replaceWith(op.from, op.to, new InlineHtmlWidget(sanitizeHtml(op.raw, baseDir), op.from));
@@ -592,10 +643,11 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
     }
 
     // Bear-style tag pills: a viewport-only plain-text scan (the Lezer parser
-    // doesn't model tags). Mark each `#tag` with a clickable pill class.
+    // doesn't model tags). Mark each `#tag` with a clickable pill class. Skipped
+    // in inline-only mode (a `#` in a table cell is literal text).
     let ln = state.doc.lineAt(from).number;
     const lastLn = state.doc.lineAt(to).number;
-    for (; ln <= lastLn; ln++) {
+    for (; !inlineMode && ln <= lastLn; ln++) {
       const line = state.doc.line(ln);
       if (inTable(line.from) || inCode(line.from) || inHtmlBlock(line.from) || inHtmlRegion(line.from)) continue;
       // Link reference definition line — styled, with placeholders for empty
@@ -623,7 +675,7 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
   // edit area: the `<tag>`/`</tag>` show on the first/last lines and an "HTML"
   // badge marks the top-right. Idle regions are rendered by htmlBlockField. Done
   // once (regions are whole-doc), after the viewport passes.
-  if (htmlOn) {
+  if (htmlOn && !inlineMode) {
     for (const r of htmlRegions) {
       if (!isElementActive(state, r.from, r.to)) continue;
       const startLine = state.doc.lineAt(r.from);

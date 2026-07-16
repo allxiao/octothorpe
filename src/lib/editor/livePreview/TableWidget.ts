@@ -15,6 +15,10 @@ import {
   type Align,
   type TableModel,
 } from "../commands/table";
+import { renderCellMarkdown, type CellRenderOpts } from "./cellRender";
+import { mountCellEditor, type CellEditorHandlers, type CellEditorOpts } from "./cellEditor";
+import { imageBaseDir, inlineMathDisplayStyle } from "./config";
+import { linkRefsField } from "./linkRefs";
 
 /** Structural / alignment operations a table can perform. */
 export type TableOp =
@@ -111,19 +115,15 @@ function setTableWidthMode(view: EditorView, mode: TableWidthMode) {
   view.dispatch({ effects: setTableWidthEffect.of(mode) });
 }
 
-/** Text content of a contenteditable cell, normalized to a single line. */
+/** A cell's Markdown source, normalized to a single line (drop nbsp, collapse
+ *  newlines). Cells render Markdown live but store their true source in
+ *  `dataset.src`; this reads that (falling back to text content while editing). */
 function cellText(el: HTMLElement): string {
-  return (el.textContent ?? "").replace(/ /g, " ").replace(/\s*\n\s*/g, " ");
+  return normalizeCell(el.dataset.src ?? el.textContent);
 }
 
-function caretToEnd(el: HTMLElement) {
-  el.focus();
-  const range = document.createRange();
-  range.selectNodeContents(el);
-  range.collapse(false);
-  const sel = window.getSelection();
-  sel?.removeAllRanges();
-  sel?.addRange(range);
+function normalizeCell(s: string | null | undefined): string {
+  return (s ?? "").replace(/ /g, " ").replace(/\s*\n\s*/g, " ");
 }
 
 const alignName = (a: Align): "left" | "center" | "right" | "" =>
@@ -199,6 +199,14 @@ export class TableWidget extends WidgetType {
 
   toDOM(view: EditorView): HTMLElement {
     const model = parseTableText(this.md);
+    // Options for rendering each cell's Markdown inline (mirrors the editor). The
+    // document's link-ref definitions are threaded in so `[text][id]` in a cell
+    // resolves against the whole document.
+    const opts: CellEditorOpts = {
+      baseDir: view.state.facet(imageBaseDir),
+      displaystyle: view.state.facet(inlineMathDisplayStyle),
+      linkRefs: view.state.field(linkRefsField, false) ?? new Map(),
+    };
 
     const wrap = document.createElement("div");
     wrap.className = "cm-md-table-wrap";
@@ -207,26 +215,32 @@ export class TableWidget extends WidgetType {
     // Active cell position (kept across the DOM's lifetime via this closure).
     let activeCol = 0;
     let activeRow = -1; // -1 = header
+    // The one focused cell's nested inline editor (mounted on focus, one at a time).
+    let activeEditor: EditorView | null = null;
+    let activeCellEl: HTMLElement | null = null;
+    // True while hopping between cells, so the exit-commit (focusout) is suppressed.
+    let navigating = false;
 
     const table = document.createElement("table");
     table.className = "cm-md-table";
 
     const thead = document.createElement("thead");
     const htr = document.createElement("tr");
-    model.header.forEach((cell, c) => htr.appendChild(this.makeCell("th", cell, model.align[c])));
+    model.header.forEach((cell, c) => htr.appendChild(this.makeCell("th", cell, model.align[c], opts)));
     thead.appendChild(htr);
     table.appendChild(thead);
 
     const tbody = document.createElement("tbody");
     model.rows.forEach((row) => {
       const tr = document.createElement("tr");
-      row.forEach((cell, c) => tr.appendChild(this.makeCell("td", cell, model.align[c])));
+      row.forEach((cell, c) => tr.appendChild(this.makeCell("td", cell, model.align[c], opts)));
       tbody.appendChild(tr);
     });
     table.appendChild(tbody);
 
     // All structural / alignment ops go through here, from the toolbar, the ⋮
     // menu, and the Paragraph → Table menu (via the active-table controller).
+    // After the op re-renders the table, re-open the editor in the active cell.
     const restoreFocus = () => {
       requestAnimationFrame(() => {
         const cur = findTables(view.state, this.from, this.from).find((t) => t.from === this.from);
@@ -240,12 +254,18 @@ export class TableWidget extends WidgetType {
           activeRow < 0
             ? (container.querySelector("thead tr") as HTMLElement | null)
             : (bodyRows[Math.min(activeRow, bodyRows.length - 1)] as HTMLElement | undefined) ?? null;
-        const cell = rowEl?.children[Math.min(activeCol, rowEl.children.length - 1)];
-        if (cell instanceof HTMLElement) caretToEnd(cell);
+        const cell = rowEl?.children[Math.min(activeCol, (rowEl?.children.length ?? 1) - 1)];
+        // Re-clicking mounts the new widget's own editor in that cell.
+        if (cell instanceof HTMLElement)
+          cell.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, clientX: 0, clientY: 0 }));
       });
     };
 
     const doOp = (op: TableOp) => {
+      // Fold the active cell edit back into the DOM/model before reading it.
+      navigating = true;
+      teardownActive();
+      navigating = false;
       if (op === "copy") {
         void writeText(renderTableText(this.readModel(wrap))).catch(() => {});
         restoreFocus();
@@ -342,112 +362,150 @@ export class TableWidget extends WidgetType {
     scroll.appendChild(table);
     wrap.append(toolbar, scroll);
 
-    // --- events ---
-    wrap.addEventListener("focusin", (e) => {
-      const cell = (e.target as HTMLElement).closest("th,td") as HTMLElement | null;
-      if (!cell) return;
+    // --- editing: click a cell to mount a nested inline CodeMirror in it, so the
+    //     cell gets element-level source reveal (only the element at the caret
+    //     shows raw Markdown) like the main document. One editor at a time. ---
+    const numCols = () => wrap.querySelectorAll("thead th").length;
+    const bodyRowEls = () => [...wrap.querySelectorAll("tbody tr")] as HTMLElement[];
+    const cellAt = (row: number, col: number): HTMLElement | null => {
+      const cols = numCols();
+      const c = Math.max(0, Math.min(col, cols - 1));
+      if (row < 0) return (wrap.querySelector("thead tr")?.children[c] as HTMLElement) ?? null;
+      const rows = bodyRowEls();
+      if (!rows.length) return null;
+      const r = Math.max(0, Math.min(row, rows.length - 1));
+      return (rows[r].children[c] as HTMLElement) ?? null;
+    };
+
+    // Fold the active editor back to static rendered HTML (+ dataset.src).
+    function teardownActive() {
+      if (!activeEditor || !activeCellEl) return;
+      const src = normalizeCell(activeEditor.state.doc.toString());
+      const cell = activeCellEl;
+      activeEditor.destroy();
+      activeEditor = null;
+      activeCellEl = null;
+      cell.dataset.src = src;
+      cell.innerHTML = renderCellMarkdown(src, opts);
+    }
+
+    const self = this;
+    function mountInCell(cell: HTMLElement, caret: "start" | "end" | { x: number; y: number }) {
+      if (activeCellEl === cell && activeEditor) return;
+      navigating = true;
+      teardownActive();
+      navigating = false;
       const tr = cell.parentElement as HTMLElement;
       activeCol = [...tr.children].indexOf(cell);
-      activeRow =
-        (tr.parentElement as HTMLElement).tagName === "THEAD"
-          ? -1
-          : [...(tr.parentElement as HTMLElement).children].indexOf(tr);
+      activeRow = (tr.parentElement as HTMLElement).tagName === "THEAD" ? -1 : bodyRowEls().indexOf(tr);
+      activeTable = { from: self.from, run: doOp };
       menu.style.display = "none";
-      activeTable = { from: this.from, run: doOp };
+      const src = cell.dataset.src ?? "";
+      cell.innerHTML = "";
+      activeCellEl = cell;
+      const ed = mountCellEditor(cell, src, opts, handlers);
+      activeEditor = ed;
+      ed.focus();
+      if (caret === "start") {
+        ed.dispatch({ selection: { anchor: 0 } });
+      } else if (caret === "end") {
+        ed.dispatch({ selection: { anchor: ed.state.doc.length } });
+      } else {
+        // Map click coords to a document position only after the fresh editor has
+        // laid out (posAtCoords is unreliable before the first measure).
+        requestAnimationFrame(() => {
+          if (activeEditor !== ed) return;
+          const p = ed.posAtCoords(caret);
+          ed.dispatch({ selection: { anchor: p ?? ed.state.doc.length } });
+        });
+      }
+    }
+
+    function focusCell(row: number, col: number, caret: "start" | "end") {
+      const cell = cellAt(row, col);
+      if (cell) mountInCell(cell, caret);
+    }
+
+    // Leave the table into the document: commit the whole table, place the caret.
+    function exitTable(anchor: number | null) {
+      navigating = true;
+      teardownActive();
+      navigating = false;
+      self.commit(view, wrap);
+      view.focus();
+      if (anchor != null) {
+        const pos = Math.max(0, Math.min(anchor, view.state.doc.length));
+        view.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
+      }
+    }
+    const exitUp = () => exitTable(self.from > 0 ? self.from - 1 : self.from);
+    const exitDown = () => {
+      navigating = true;
+      teardownActive();
+      navigating = false;
+      self.commit(view, wrap);
+      view.focus();
+      const to = self.range(view).to;
+      const endLine = view.state.doc.lineAt(Math.min(to, view.state.doc.length));
+      if (endLine.number < view.state.doc.lines) {
+        view.dispatch({ selection: { anchor: view.state.doc.line(endLine.number + 1).from }, scrollIntoView: true });
+      } else {
+        view.dispatch({ changes: { from: endLine.to, insert: "\n" }, selection: { anchor: endLine.to + 1 }, scrollIntoView: true });
+      }
+    };
+    const moveLinear = (dir: number, caret: "start" | "end" = dir > 0 ? "start" : "end") => {
+      let col = activeCol + dir;
+      let row = activeRow;
+      const n = numCols();
+      if (col >= n) { col = 0; row += 1; }
+      else if (col < 0) { col = n - 1; row -= 1; }
+      if (row < -1) { exitUp(); return; }
+      if (row > bodyRowEls().length - 1) self.appendRow(wrap);
+      focusCell(row, col, caret);
+    };
+
+    const handlers: CellEditorHandlers = {
+      onInput: (src) => { if (activeCellEl) activeCellEl.dataset.src = normalizeCell(src); },
+      tab: (back) => moveLinear(back ? -1 : 1),
+      enter: () => {
+        const row = activeRow + 1;
+        if (row > bodyRowEls().length - 1) self.appendRow(wrap);
+        focusCell(row, activeCol, "end");
+      },
+      escape: () => exitTable(self.from),
+      up: () => (activeRow <= -1 ? exitUp() : focusCell(activeRow - 1, activeCol, "end")),
+      down: () => (activeRow >= bodyRowEls().length - 1 ? exitDown() : focusCell(activeRow + 1, activeCol, "end")),
+      left: () => moveLinear(-1, "end"),
+      right: () => moveLinear(1, "start"),
+    };
+
+    // Click a cell → mount its editor at the click position.
+    wrap.addEventListener("mousedown", (e) => {
+      const cell = (e.target as HTMLElement).closest?.("th,td") as HTMLElement | null;
+      if (!cell || !wrap.contains(cell)) return;
+      if (activeCellEl === cell && activeEditor) return; // already editing → native click
+      e.preventDefault();
+      mountInCell(cell, { x: e.clientX, y: e.clientY });
     });
+    // Focus left the table entirely (clicked outside) → commit.
     wrap.addEventListener("focusout", (e) => {
-      if (!wrap.contains(e.relatedTarget as Node)) this.commit(view, wrap);
+      if (navigating) return;
+      const to = e.relatedTarget as Node | null;
+      if (to && wrap.contains(to)) return;
+      if (activeEditor) { navigating = true; teardownActive(); navigating = false; }
+      this.commit(view, wrap);
     });
-    wrap.addEventListener("keydown", (e) => this.onKeydown(e, view, wrap));
 
     return wrap;
   }
 
-  private makeCell(tag: "th" | "td", text: string, align: Align): HTMLElement {
+  private makeCell(tag: "th" | "td", text: string, align: Align, opts: CellRenderOpts): HTMLElement {
     const el = document.createElement(tag);
-    el.contentEditable = "true";
-    el.textContent = text;
+    el.dataset.src = text;
+    el.innerHTML = renderCellMarkdown(text, opts);
     const a = alignName(align);
     if (a) el.style.textAlign = a;
     return el;
-  }
-
-  private onKeydown(e: KeyboardEvent, view: EditorView, wrap: HTMLElement) {
-    const cell = (e.target as HTMLElement).closest("th,td") as HTMLElement | null;
-    if (!cell) return;
-
-    if (e.key === "Tab") {
-      e.preventDefault();
-      const all = [...wrap.querySelectorAll("th,td")] as HTMLElement[];
-      const i = all.indexOf(cell);
-      const next = all[i + (e.shiftKey ? -1 : 1)];
-      if (next) caretToEnd(next);
-      else if (!e.shiftKey) caretToEnd(this.appendRow(wrap).children[0] as HTMLElement);
-      return;
-    }
-    if (e.key === "Enter") {
-      e.preventDefault();
-      const tr = cell.parentElement as HTMLElement;
-      const col = [...tr.children].indexOf(cell);
-      const inHead = (tr.parentElement as HTMLElement).tagName === "THEAD";
-      const target = inHead
-        ? (wrap.querySelector("tbody tr") as HTMLElement | null)
-        : (tr.nextElementSibling as HTMLElement | null);
-      const row = target ?? this.appendRow(wrap);
-      caretToEnd(row.children[col] as HTMLElement);
-      return;
-    }
-    if (e.key === "Escape") {
-      e.preventDefault();
-      cell.blur();
-      view.focus();
-      return;
-    }
-
-    if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-      const tr = cell.parentElement as HTMLElement;
-      const col = [...tr.children].indexOf(cell);
-      const inHead = (tr.parentElement as HTMLElement).tagName === "THEAD";
-      const focusInRow = (row: HTMLElement | null) => {
-        if (!row) return;
-        caretToEnd(row.children[Math.min(col, row.children.length - 1)] as HTMLElement);
-      };
-      e.preventDefault();
-      if (e.key === "ArrowUp") {
-        if (inHead) this.exitUp(view);
-        else focusInRow((tr.previousElementSibling as HTMLElement) ?? wrap.querySelector("thead tr"));
-      } else {
-        if (inHead) focusInRow(wrap.querySelector("tbody tr"));
-        else {
-          const next = tr.nextElementSibling as HTMLElement | null;
-          if (next) focusInRow(next);
-          else this.exitDown(view);
-        }
-      }
-    }
-  }
-
-  private exitUp(view: EditorView) {
-    if (this.from === 0) return; // nothing above
-    view.focus(); // blur cell → commit via focusout
-    view.dispatch({ selection: { anchor: this.from - 1 }, scrollIntoView: true });
-  }
-
-  private exitDown(view: EditorView) {
-    view.focus(); // blur cell → commit via focusout
-    const st = view.state;
-    const end = this.range(view).to;
-    const endLine = st.doc.lineAt(Math.min(end, st.doc.length));
-    if (endLine.number < st.doc.lines) {
-      view.dispatch({ selection: { anchor: st.doc.line(endLine.number + 1).from }, scrollIntoView: true });
-    } else {
-      // Table is the last element — add a line so the caret can leave downward.
-      view.dispatch({
-        changes: { from: endLine.to, insert: "\n" },
-        selection: { anchor: endLine.to + 1 },
-        scrollIntoView: true,
-      });
-    }
   }
 
   private appendRow(wrap: HTMLElement): HTMLElement {
@@ -456,7 +514,7 @@ export class TableWidget extends WidgetType {
     const tr = document.createElement("tr");
     for (let i = 0; i < cols; i++) {
       const td = document.createElement("td");
-      td.contentEditable = "true";
+      td.dataset.src = "";
       tr.appendChild(td);
     }
     tbody.appendChild(tr);

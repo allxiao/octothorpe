@@ -46,6 +46,24 @@ export class InlineHtmlWidget extends WidgetType {
 }
 
 /**
+ * A bare `<br>` inserted *after* a revealed `<br/>` tag, so its line break is
+ * preserved even while the raw source is shown for editing (the caret is on the
+ * tag). Without it the two lines would collapse into one, and the text would
+ * flash between one and two lines as the caret moves across the `<br/>`.
+ */
+export class BreakWidget extends WidgetType {
+  eq() {
+    return true;
+  }
+  toDOM() {
+    return document.createElement("br");
+  }
+  ignoreEvent() {
+    return true;
+  }
+}
+
+/**
  * A block of embedded HTML (`<details>`, `<table>`, `<svg>`, media, sandboxed
  * iframes, …) rendered in place of its source when the caret is outside it. The
  * content is interactive (a `<summary>` toggles its `<details>`, video controls

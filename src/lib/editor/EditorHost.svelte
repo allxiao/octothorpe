@@ -86,7 +86,9 @@
         ? appearancePrefs.get<number>("fontSize")
         : 15;
     return EditorView.theme({
-      ".cm-scroller": {
+      // Direct child so this doesn't leak into nested editors mounted in table
+      // cells (which live deeper inside this .cm-editor and set their own font).
+      "& > .cm-scroller": {
         fontSize: `${size}px`,
         lineHeight: String(appearancePrefs.get<number>("lineHeight")),
       },
@@ -489,7 +491,10 @@
     font-family: var(--editor-font);
     /* font-size and line-height are driven by preferences via typographyComp. */
   }
-  .editor :global(.cm-content) {
+  /* The main document's content. Excludes nested editors mounted inside table
+     cells (`.cm-md-table-wrap`), which set their own chrome — otherwise the 40vh
+     bottom padding etc. would leak into a focused cell and make it huge. */
+  .editor :global(.cm-content:not(.cm-md-table-wrap *)) {
     max-width: var(--editor-max-width, 860px);
     margin: 0 auto;
     /* Horizontal gutter is split three ways to align a code/math/mermaid block's

@@ -139,7 +139,7 @@ class LivePreviewPlugin {
   }
 }
 
-const livePreviewPlugin = ViewPlugin.fromClass(LivePreviewPlugin, {
+export const livePreviewPlugin = ViewPlugin.fromClass(LivePreviewPlugin, {
   decorations: (v) => v.decorations,
   // Make hidden/replaced spans atomic so the cursor and selection step over
   // them instead of landing inside a marker that isn't visible.
@@ -149,9 +149,8 @@ const livePreviewPlugin = ViewPlugin.fromClass(LivePreviewPlugin, {
 
 // Apply the persisted table width mode (compact/full) as a class on the editor
 // root so tables pick it up; the toolbar buttons update it via a state effect.
-const livePreviewTheme = EditorView.theme({
-  // Horizontal line padding (CM default is 6px/2px). Raised to 16px and paired
-  // with a reduced .cm-content padding (6px, see EditorHost) and code-block
+export const livePreviewTheme = EditorView.theme({
+  // Horizontal line padding (CM default is 6px/2px). Raised to 16px and paired  // with a reduced .cm-content padding (6px, see EditorHost) and code-block
   // padding (10px) so that a code/math/mermaid block's full-line selection edges
   // — which CodeMirror measures from this line padding — line up exactly with the
   // block's text (content 6 + code 10 = line 16). Code fences/blocks below
@@ -603,6 +602,11 @@ const livePreviewTheme = EditorView.theme({
   ".cm-md-table th:focus, .cm-md-table td:focus": {
     outline: "2px solid var(--accent, #3b82f6)",
     outlineOffset: "-2px",
+  },
+  // Cells render their Markdown inline (bold/code/links/math/emoji…); keep any
+  // rendered image or math from overflowing the cell.
+  ".cm-md-table th img, .cm-md-table td img, .cm-md-table th .katex, .cm-md-table td .katex": {
+    maxWidth: "100%",
   },
   ".cm-md-table-toolbar": {
     position: "absolute",

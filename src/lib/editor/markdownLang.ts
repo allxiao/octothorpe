@@ -31,6 +31,16 @@ const mathNesting: MarkdownConfig = {
 };
 
 /**
+ * The Lezer-markdown parser extensions that define this app's inline/GFM syntax
+ * (tables, task lists, strikethrough, `$…$` math, sub/superscript, `==highlight==`,
+ * `:emoji:`). Shared so the editor language and the standalone table-cell renderer
+ * ([livePreview/cellRender.ts]) parse identically. The editor additionally layers
+ * `mathNesting` (a highlighting-only overlay) on top; the cell renderer doesn't
+ * need it (it reads `InlineMath` text directly).
+ */
+export const MD_EXTENSIONS = [GFM, mathMarkdown, Subscript, Superscript, Highlight, Emoji];
+
+/**
  * Markdown language support driven by the incremental, error-tolerant Lezer
  * parser. GFM extensions add tables, task lists, strikethrough, etc.
  * `mathMarkdown` adds `$…$` / `$$…$$` LaTeX nodes; `mathNesting` highlights their
@@ -48,7 +58,7 @@ export function markdownLang() {
       if (info === "mermaid") return mermaidLanguage;
       return LanguageDescription.matchLanguageName(languages, info, true);
     },
-    extensions: [GFM, mathMarkdown, mathNesting, Subscript, Superscript, Highlight, Emoji],
+    extensions: [...MD_EXTENSIONS, mathNesting],
     // Disable lang-html's built-in `>` tag auto-close: our htmlComplete handler
     // owns tag completion (Markdown `</` closing, and the pretty 3-line block
     // form inside HTML code contexts), so the two must not both fire on `>`.

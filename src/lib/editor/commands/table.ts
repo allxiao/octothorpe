@@ -442,13 +442,30 @@ export function tableDelete(view: EditorView): boolean {
   return true;
 }
 
+/** Enter a table cell: cells mount their inline editor on mousedown, so dispatch
+ *  one at the cell (a plain `.focus()` does nothing — cells aren't contenteditable). */
+function enterCell(cell: HTMLElement) {
+  const r = cell.getBoundingClientRect();
+  cell.dispatchEvent(
+    new MouseEvent("mousedown", {
+      bubbles: true,
+      cancelable: true,
+      view: window,
+      clientX: r.left + 6,
+      clientY: r.top + r.height / 2,
+      button: 0,
+    }),
+  );
+}
+
 /** Focus the first cell of the table at `tableFrom` (after its DOM renders). */
 export function focusTableCell(view: EditorView, tableFrom: number, selector: string) {
   requestAnimationFrame(() => {
     const node: Node = view.domAtPos(tableFrom).node;
     const el = node instanceof HTMLElement ? node : node.parentElement;
     const wrap = el?.closest(".cm-md-table-wrap") ?? view.dom.querySelector(".cm-md-table-wrap");
-    (wrap?.querySelector(selector) as HTMLElement | null)?.focus();
+    const cell = wrap?.querySelector(selector);
+    if (cell instanceof HTMLElement) enterCell(cell);
   });
 }
 
@@ -460,7 +477,7 @@ function focusTableEdge(view: EditorView, tableFrom: number, edge: "first" | "la
   const selector = edge === "first" ? "thead th" : "tbody tr:last-child td";
   const cell = wrap?.querySelector(selector);
   if (!(cell instanceof HTMLElement)) return false;
-  cell.focus();
+  enterCell(cell);
   return true;
 }
 

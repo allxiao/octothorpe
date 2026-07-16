@@ -1,4 +1,4 @@
-import { StateField, type EditorState } from "@codemirror/state";
+import { StateField, Facet, type EditorState } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
 
 /** A resolved link reference definition (`[id]: url "title"`). */
@@ -12,7 +12,7 @@ export interface LinkRef {
 const CONTAINERS = new Set(["Document", "Blockquote", "BulletList", "OrderedList", "ListItem"]);
 
 /** CommonMark link-label matching: case-insensitive, whitespace-collapsed. */
-function normalize(label: string): string {
+export function normalizeLabel(label: string): string {
   return label.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
@@ -28,7 +28,7 @@ function build(state: EditorState): Map<string, LinkRef> {
         const label = n.getChild("LinkLabel");
         const url = n.getChild("URL");
         if (label && url) {
-          const key = normalize(inner(state.doc.sliceString(label.from, label.to)));
+          const key = normalizeLabel(inner(state.doc.sliceString(label.from, label.to)));
           if (key && !map.has(key)) {
             const title = n.getChild("LinkTitle");
             map.set(key, {
@@ -56,7 +56,18 @@ export const linkRefsField = StateField.define<Map<string, LinkRef>>({
   },
 });
 
+/**
+ * Override map of link reference definitions. When set, `resolveLinkRef` uses it
+ * instead of the document's own `linkRefsField`. The nested table-cell editor sets
+ * this to the *main* document's definitions, so a `[text][id]` inside a cell
+ * resolves against the whole document (the cell's own tiny doc has no defs).
+ */
+export const linkRefsOverride = Facet.define<Map<string, LinkRef>, Map<string, LinkRef> | null>({
+  combine: (values) => (values.length ? values[values.length - 1] : null),
+});
+
 /** Resolve a link label (from a reference-style link) to its definition, if any. */
 export function resolveLinkRef(state: EditorState, label: string): LinkRef | undefined {
-  return state.field(linkRefsField, false)?.get(normalize(label));
+  const map = state.facet(linkRefsOverride) ?? state.field(linkRefsField, false);
+  return map?.get(normalizeLabel(label));
 }

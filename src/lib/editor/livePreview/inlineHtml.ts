@@ -130,7 +130,8 @@ export type InlineHtmlOp =
   | { kind: "hide"; from: number; to: number }
   | { kind: "mark"; from: number; to: number; class: string; attributes?: Record<string, string> }
   | { kind: "widget"; from: number; to: number; raw: string }
-  | { kind: "img"; from: number; to: number; src: string; alt: string };
+  | { kind: "img"; from: number; to: number; src: string; alt: string }
+  | { kind: "break"; pos: number };
 
 export interface InlineHtmlResult {
   ops: InlineHtmlOp[];
@@ -172,7 +173,13 @@ export function collectInlineHtml(
   // real break, `<img>` reuses the Markdown image widget, others render their
   // sanitized selves. Editing (caret on the tag) leaves the raw source.
   const emitVoid = (tag: HtmlTagInfo) => {
-    if (isElementActive(state, tag.from, tag.to)) return;
+    if (isElementActive(state, tag.from, tag.to)) {
+      // Revealed for editing. For `<br>`, still emit a line break *after* the raw
+      // source so the two lines don't collapse into one while it's shown (avoids
+      // the text flashing between one and two lines as the caret passes over it).
+      if (tag.name === "br") ops.push({ kind: "break", pos: tag.to });
+      return;
+    }
     if (tag.name === "img") {
       const src = attr(tag.raw, "src");
       if (src) ops.push({ kind: "img", from: tag.from, to: tag.to, src, alt: attr(tag.raw, "alt") ?? "" });
@@ -215,7 +222,10 @@ export function collectInlineHtml(
       // widget): the outer widget re-renders them, and overlapping replace
       // decorations are illegal.
       for (let i = ops.length - 1; i >= 0; i--) {
-        if (ops[i].from >= open.from && ops[i].to <= tag.to) ops.splice(i, 1);
+        const o = ops[i];
+        const f = o.kind === "break" ? o.pos : o.from;
+        const t = o.kind === "break" ? o.pos : o.to;
+        if (f >= open.from && t <= tag.to) ops.splice(i, 1);
       }
       ops.push({ kind: "widget", from: open.from, to: tag.to, raw: slice(open.from, tag.to) });
       continue;
