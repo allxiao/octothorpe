@@ -20,6 +20,7 @@ import { mountCellEditor, type CellEditorHandlers, type CellEditorOpts } from ".
 import { imageBaseDir, inlineMathDisplayStyle, renderFootnotes } from "./config";
 import { linkRefsField } from "./linkRefs";
 import { footnotesField, gotoOrCreateFootnote } from "./footnotes";
+import { followRenderedLink } from "./linkNav";
 
 /** Structural / alignment operations a table can perform. */
 export type TableOp =
@@ -500,11 +501,28 @@ export class TableWidget extends WidgetType {
           return;
         }
       }
+      // Ctrl/Cmd + click a rendered link navigates in the main document too. The
+      // cell renders real `<a href>` elements, so the actual open/jump/create runs
+      // on `click` (to cancel the native navigation); here we only avoid entering
+      // cell-edit mode.
+      if ((e.ctrlKey || e.metaKey) && target.closest?.(".cm-md-link")) {
+        e.preventDefault();
+        return;
+      }
       const cell = target.closest?.("th,td") as HTMLElement | null;
       if (!cell || !wrap.contains(cell)) return;
       if (activeCellEl === cell && activeEditor) return; // already editing → native click
       e.preventDefault();
       mountInCell(cell, { x: e.clientX, y: e.clientY });
+    });
+    // Navigate a Ctrl/Cmd-clicked link on `click`, cancelling the `<a>`'s native
+    // navigation (the mousedown above kept us out of cell-edit mode).
+    wrap.addEventListener("click", (e) => {
+      const link = (e.target as HTMLElement).closest?.(".cm-md-link");
+      if (link && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        followRenderedLink(view, link);
+      }
     });
     // Focus left the table entirely (clicked outside) → commit.
     wrap.addEventListener("focusout", (e) => {
