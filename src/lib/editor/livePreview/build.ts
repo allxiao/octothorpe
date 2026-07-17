@@ -438,8 +438,8 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
           if (footnotesOn && !inlineMode && !isFootnoteDefMarker(state, node.from, node.to) &&
               !isElementActive(state, node.from, node.to)) {
             const label = slice(node.from + 2, node.to - 1);
-            const hasDef = !!resolveFootnote(state, label);
-            replaceWith(node.from, node.to, new FootnoteRefWidget(label, node.from, hasDef));
+            const def = resolveFootnote(state, label);
+            replaceWith(node.from, node.to, new FootnoteRefWidget(label, node.from, def ? def.content : null));
           }
           return false; // never descend into the `[^ … ]` marks
         }
@@ -691,10 +691,7 @@ export function buildDecorations(view: EditorView): BuiltDecorations {
           decos.push(
             Decoration.mark({
               class: "cm-md-footnote-def",
-              attributes: {
-                "data-label": fdef[2],
-                title: "Ctrl-click to jump to the first reference",
-              },
+              attributes: { "data-label": fdef[2] },
             }).range(markerFrom, markerTo),
           );
         }

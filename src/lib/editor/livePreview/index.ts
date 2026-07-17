@@ -7,6 +7,7 @@ import {
 } from "@codemirror/view";
 import type { Extension } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
+import type { SyntaxNode } from "@lezer/common";
 import { buildDecorations } from "./build";
 import { onTagClick, revealSimpleSource, inlineMathRender, inlineMathDisplayStyle, renderHtml, renderSubscript, renderSuperscript, renderHighlight, renderEmoji, renderFootnotes } from "./config";
 import { tableField } from "./tableField";
@@ -16,8 +17,8 @@ import { clearMermaidCache, mermaidReadyEffect } from "../mermaid/render";
 import { mathRendererEffect } from "../math/render";
 import { htmlBlockField } from "./htmlBlockField";
 import { inlineMathTooltipField } from "./mathTooltip";
-import { linkRefsField } from "./linkRefs";
-import { footnotesField, footnoteHover, firstFootnoteReferencePos } from "./footnotes";
+import { linkRefsField, resolveLinkRef } from "./linkRefs";
+import { footnotesField, firstFootnoteReferencePos, gotoOrCreateFootnote, isFootnoteDefMarker } from "./footnotes";
 import { clearActiveTable, tableWidthField } from "./TableWidget";
 import { openUrl } from "../../ipc/commands";
 
@@ -102,6 +103,80 @@ function createOrGotoDef(view: EditorView, label: string) {
     selection: { anchor: at + stub.length },
     scrollIntoView: true,
   });
+}
+
+/** Follow a Markdown link's destination: open a URL, jump to a `#anchor`, or (for
+ *  a reference link) resolve it — jumping/opening when defined, or scaffolding a
+ *  definition when missing. Returns whether it did anything. Shared by the
+ *  rendered-link handler and the edit-mode Ctrl-click path. */
+function followLink(view: EditorView, node: SyntaxNode): boolean {
+  const state = view.state;
+  const slice = (a: number, b: number) => state.doc.sliceString(a, b);
+  const open = (dest: string) => {
+    const url = dest.replace(/^<([\s\S]*)>$/, "$1").trim();
+    if (!url) return false;
+    if (url.startsWith("#")) jumpToAnchor(view, url.slice(1));
+    else openExternal(url);
+    return true;
+  };
+
+  // Inline link with a parsed URL destination (`[text](url)`, `[text](<url>)`).
+  const urlNode = node.getChild("URL");
+  if (urlNode) return open(slice(urlNode.from, urlNode.to));
+
+  const marks = node.getChildren("LinkMark");
+  // Lenient inline form: `[text](destination)` whose URL may contain spaces.
+  const lineTo = state.doc.lineAt(node.to).to;
+  const lenient = marks.length === 2 ? /^\(\s*([^)]+?)\s*\)/.exec(slice(node.to, lineTo)) : null;
+  if (lenient) {
+    let dest = lenient[1];
+    const tm = /^([\s\S]*?)\s+"([^"]*)"$/.exec(dest); // strip an optional trailing title
+    if (tm) dest = tm[1];
+    return open(dest);
+  }
+
+  // Reference link `[text][id]` / `[text][]`: open the resolved definition, or
+  // scaffold one when it's missing (mirrors the rendered `data-missing` path).
+  const ref = /^\[([^\]]*)\]\[([^\]]*)\]$/.exec(slice(node.from, node.to));
+  if (ref) {
+    const label = ref[2].trim() ? ref[2] : ref[1];
+    const resolved = resolveLinkRef(state, label);
+    if (resolved) return open(resolved.url);
+    createOrGotoDef(view, label);
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Ctrl/Cmd+click navigation resolved from the document position rather than a
+ * rendered decoration — so it works while a link or footnote reference is in its
+ * revealed (raw source) editing form, not just as a rendered pill/link. Returns
+ * whether it navigated.
+ */
+function ctrlNavAtPos(view: EditorView, pos: number): boolean {
+  const state = view.state;
+  let acted = false;
+  syntaxTree(state).iterate({
+    from: pos,
+    to: pos,
+    enter: (node) => {
+      if (acted) return false;
+      if (node.name === "FootnoteReference") {
+        if (!isFootnoteDefMarker(state, node.from, node.to)) {
+          gotoOrCreateFootnote(view, state.doc.sliceString(node.from + 2, node.to - 1));
+          acted = true;
+        }
+        return false;
+      }
+      if (node.name === "Link") {
+        acted = followLink(view, node.node);
+        return false;
+      }
+      return undefined;
+    },
+  });
+  return acted;
 }
 
 /**
@@ -302,21 +377,6 @@ export const livePreviewTheme = EditorView.theme({
   ".cm-md-footnote-ref-missing:hover": { background: "rgba(245, 158, 11, 0.28)" },
   // Definition marker `[^label]:` — dimmed so the content reads as the note body.
   ".cm-md-footnote-def": { opacity: "0.5" },
-  // Hover preview of a footnote's definition (a dark rounded card). Below the
-  // app's modals (100), like the math tooltip.
-  ".cm-md-footnote-tooltip": {
-    zIndex: "40 !important",
-    maxWidth: "360px",
-    padding: "0.4em 0.7em",
-    borderRadius: "6px",
-    background: "var(--tooltip-bg, #1f2430)",
-    color: "var(--tooltip-fg, #f5f5f5)",
-    boxShadow: "0 2px 12px rgba(0, 0, 0, 0.35)",
-    fontSize: "0.9em",
-    lineHeight: "1.45",
-    overflowWrap: "break-word",
-  },
-  ".cm-md-footnote-tooltip-missing": { fontStyle: "italic", opacity: "0.85" },
   // Rendered inline HTML tags (Typora-style). Kept inline-editable via mark
   // decorations; the tag markers are hidden while the caret is outside.
   ".cm-html-kbd": {
@@ -767,6 +827,23 @@ const interactionHandlers = EditorView.domEventHandlers({
         return true;
       }
     }
+    // Edit-mode fallback: Ctrl/Cmd + click a link or footnote reference whose
+    // source is *revealed* (raw `[text](url)` / `[^label]`, so no rendered pill or
+    // link mark to hit). Resolve it from the document position instead — the same
+    // jump/open/create as the rendered forms. Only when nothing already-handled
+    // was clicked (a rendered link/footnote/tag is handled above).
+    if (event.ctrlKey || event.metaKey) {
+      const handled = target?.closest?.(
+        ".cm-md-link, .cm-md-footnote-ref, .cm-md-footnote-def, .cm-md-tag",
+      );
+      if (!handled) {
+        const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+        if (pos != null && ctrlNavAtPos(view, pos)) {
+          event.preventDefault();
+          return true;
+        }
+      }
+    }
     const pill = target?.closest?.(".cm-md-tag");
     const tag = pill?.getAttribute("data-tag");
     if (tag) {
@@ -886,7 +963,6 @@ export function livePreview(): Extension {
     mermaidField,
     htmlBlockField,
     inlineMathTooltipField,
-    footnoteHover,
     livePreviewPlugin,
     tableWidthField,
     livePreviewTheme,

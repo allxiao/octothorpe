@@ -1,9 +1,6 @@
 import { StateField, type EditorState } from "@codemirror/state";
-import { EditorView, hoverTooltip, type Tooltip } from "@codemirror/view";
+import { EditorView } from "@codemirror/view";
 import { syntaxTree } from "@codemirror/language";
-import { renderFootnotes, imageBaseDir, inlineMathDisplayStyle } from "./config";
-import { renderCellMarkdown } from "./cellRender";
-import { linkRefsField } from "./linkRefs";
 
 /** A resolved footnote definition (`[^label]: content`). */
 export interface Footnote {
@@ -136,53 +133,3 @@ export function gotoOrCreateFootnote(view: EditorView, label: string): void {
   });
 }
 
-/**
- * Typora-style hover preview: hovering a footnote reference floats a tooltip
- * showing the rendered definition content (bold/italic/links/… via the shared
- * cell renderer). With no definition, it hints at the required format instead.
- */
-export const footnoteHover = hoverTooltip((view, pos): Tooltip | null => {
-  const state = view.state;
-  if (!state.facet(renderFootnotes)) return null;
-
-  const line = state.doc.lineAt(pos);
-  let ref: { from: number; to: number } | null = null;
-  syntaxTree(state).iterate({
-    from: line.from,
-    to: line.to,
-    enter: (node) => {
-      if (node.name === "FootnoteReference" && pos >= node.from && pos <= node.to) {
-        ref = { from: node.from, to: node.to };
-      }
-    },
-  });
-  if (!ref) return null;
-  const { from, to } = ref;
-  // The marker on a definition line isn't a reference — no preview.
-  if (isFootnoteDefMarker(state, from, to)) return null;
-
-  const label = state.sliceDoc(from + 2, to - 1);
-  const def = resolveFootnote(state, label);
-  return {
-    pos: from,
-    end: to,
-    above: true,
-    create: () => {
-      const dom = document.createElement("div");
-      dom.className = "cm-md-footnote-tooltip";
-      if (def && def.content.trim()) {
-        dom.innerHTML = renderCellMarkdown(def.content, {
-          baseDir: state.facet(imageBaseDir),
-          displaystyle: state.facet(inlineMathDisplayStyle),
-          linkRefs: state.field(linkRefsField, false),
-        });
-      } else {
-        dom.classList.add("cm-md-footnote-tooltip-missing");
-        dom.textContent = def
-          ? "Empty footnote — Ctrl-click to edit its content."
-          : `No definition. Ctrl-click to create "[^${label}]: …" at the end.`;
-      }
-      return { dom };
-    },
-  };
-});
