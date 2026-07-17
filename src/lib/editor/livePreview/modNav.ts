@@ -3,7 +3,8 @@ import { StateField, StateEffect, type EditorState } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
 import type { SyntaxNode } from "@lezer/common";
 import { renderFootnotes } from "./config";
-import { isFootnoteDefMarker } from "./footnotes";
+import { isFootnoteDefMarker, gotoOrCreateFootnote } from "./footnotes";
+import { followLink } from "./linkNav";
 
 /** A navigable token under the pointer/caret. */
 export interface NavTarget {
@@ -55,6 +56,25 @@ export function navTargetAtPos(state: EditorState, pos: number): NavTarget | nul
 
 /** Sets (or clears, with null) the Ctrl-hover highlight range. */
 const setModHover = StateEffect.define<{ from: number; to: number } | null>();
+
+/**
+ * Ctrl/Cmd+click navigation resolved from a document position: reads the target
+ * (link or footnote reference) from `readView` and performs the action on
+ * `actView`. The two differ for a table cell, where the token is read from the
+ * cell's editor but the jump/open/create must run on the main document. Returns
+ * whether it navigated.
+ */
+export function ctrlNavAt(readView: EditorView, pos: number, actView: EditorView = readView): boolean {
+  const t = navTargetAtPos(readView.state, pos);
+  if (!t) return false;
+  if (t.kind === "link" && t.node) return followLink(readView, t.node, actView);
+  if (t.kind === "footnote" && t.label != null) {
+    gotoOrCreateFootnote(actView, t.label);
+    return true;
+  }
+  // A footnote definition marker is handled by its own decoration handler.
+  return false;
+}
 
 const MOD_MARK = Decoration.mark({ class: "cm-md-modclick" });
 

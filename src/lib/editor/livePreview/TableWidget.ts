@@ -410,7 +410,7 @@ export class TableWidget extends WidgetType {
       const src = cell.dataset.src ?? "";
       cell.innerHTML = "";
       activeCellEl = cell;
-      const ed = mountCellEditor(cell, src, opts, handlers);
+      const ed = mountCellEditor(cell, src, opts, handlers, view);
       activeEditor = ed;
       ed.focus();
       if (caret === "start") {
@@ -489,6 +489,9 @@ export class TableWidget extends WidgetType {
     // Click a cell → mount its editor at the click position.
     wrap.addEventListener("mousedown", (e) => {
       const target = e.target as HTMLElement;
+      // Inside the active cell editor? It handles its own Ctrl-click navigation
+      // (against the main document); don't double-handle here.
+      if (activeEditor?.dom.contains(target)) return;
       // Ctrl/Cmd + click a footnote reference pill navigates in the *main*
       // document (jump to / create the definition) rather than entering cell-edit
       // mode — the cell's own tiny doc has no footnote definitions.
@@ -518,7 +521,9 @@ export class TableWidget extends WidgetType {
     // Navigate a Ctrl/Cmd-clicked link on `click`, cancelling the `<a>`'s native
     // navigation (the mousedown above kept us out of cell-edit mode).
     wrap.addEventListener("click", (e) => {
-      const link = (e.target as HTMLElement).closest?.(".cm-md-link");
+      const target = e.target as HTMLElement;
+      if (activeEditor?.dom.contains(target)) return; // active cell editor handles its own
+      const link = target.closest?.(".cm-md-link");
       if (link && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
         followRenderedLink(view, link);

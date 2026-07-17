@@ -6,8 +6,6 @@ import {
   type ViewUpdate,
 } from "@codemirror/view";
 import type { Extension } from "@codemirror/state";
-import { syntaxTree } from "@codemirror/language";
-import type { SyntaxNode } from "@lezer/common";
 import { buildDecorations } from "./build";
 import { onTagClick, revealSimpleSource, inlineMathRender, inlineMathDisplayStyle, renderHtml, renderSubscript, renderSuperscript, renderHighlight, renderEmoji, renderFootnotes } from "./config";
 import { tableField } from "./tableField";
@@ -17,73 +15,11 @@ import { clearMermaidCache, mermaidReadyEffect } from "../mermaid/render";
 import { mathRendererEffect } from "../math/render";
 import { htmlBlockField } from "./htmlBlockField";
 import { inlineMathTooltipField } from "./mathTooltip";
-import { linkRefsField, resolveLinkRef } from "./linkRefs";
-import { footnotesField, firstFootnoteReferencePos, gotoOrCreateFootnote } from "./footnotes";
-import { navTargetAtPos, modClickCursor } from "./modNav";
-import { openExternal, jumpToAnchor, createOrGotoDef, followRenderedLink } from "./linkNav";
+import { linkRefsField } from "./linkRefs";
+import { footnotesField, firstFootnoteReferencePos } from "./footnotes";
+import { modClickCursor, ctrlNavAt } from "./modNav";
+import { openExternal, jumpToAnchor, followRenderedLink } from "./linkNav";
 import { clearActiveTable, tableWidthField } from "./TableWidget";
-
-/** Follow a Markdown link's destination: open a URL, jump to a `#anchor`, or (for
- *  a reference link) resolve it — jumping/opening when defined, or scaffolding a
- *  definition when missing. Returns whether it did anything. Shared by the
- *  rendered-link handler and the edit-mode Ctrl-click path. */
-function followLink(view: EditorView, node: SyntaxNode): boolean {
-  const state = view.state;
-  const slice = (a: number, b: number) => state.doc.sliceString(a, b);
-  const open = (dest: string) => {
-    const url = dest.replace(/^<([\s\S]*)>$/, "$1").trim();
-    if (!url) return false;
-    if (url.startsWith("#")) jumpToAnchor(view, url.slice(1));
-    else openExternal(url);
-    return true;
-  };
-
-  // Inline link with a parsed URL destination (`[text](url)`, `[text](<url>)`).
-  const urlNode = node.getChild("URL");
-  if (urlNode) return open(slice(urlNode.from, urlNode.to));
-
-  const marks = node.getChildren("LinkMark");
-  // Lenient inline form: `[text](destination)` whose URL may contain spaces.
-  const lineTo = state.doc.lineAt(node.to).to;
-  const lenient = marks.length === 2 ? /^\(\s*([^)]+?)\s*\)/.exec(slice(node.to, lineTo)) : null;
-  if (lenient) {
-    let dest = lenient[1];
-    const tm = /^([\s\S]*?)\s+"([^"]*)"$/.exec(dest); // strip an optional trailing title
-    if (tm) dest = tm[1];
-    return open(dest);
-  }
-
-  // Reference link `[text][id]` / `[text][]`: open the resolved definition, or
-  // scaffold one when it's missing (mirrors the rendered `data-missing` path).
-  const ref = /^\[([^\]]*)\]\[([^\]]*)\]$/.exec(slice(node.from, node.to));
-  if (ref) {
-    const label = ref[2].trim() ? ref[2] : ref[1];
-    const resolved = resolveLinkRef(state, label);
-    if (resolved) return open(resolved.url);
-    createOrGotoDef(view, label);
-    return true;
-  }
-  return false;
-}
-
-/**
- * Ctrl/Cmd+click navigation resolved from the document position rather than a
- * rendered decoration — so it works while a link or footnote reference is in its
- * revealed (raw source) editing form, not just as a rendered pill/link. Returns
- * whether it navigated.
- */
-function ctrlNavAtPos(view: EditorView, pos: number): boolean {
-  const t = navTargetAtPos(view.state, pos);
-  if (!t) return false;
-  if (t.kind === "link" && t.node) return followLink(view, t.node);
-  if (t.kind === "footnote" && t.label != null) {
-    gotoOrCreateFootnote(view, t.label);
-    return true;
-  }
-  // A footnote definition marker is handled by its own `.cm-md-footnote-def`
-  // decoration handler (jump to first reference), so ignore it here.
-  return false;
-}
 
 /**
  * Live-preview ViewPlugin. Rebuilds decorations on document, viewport, or
@@ -736,7 +672,7 @@ const interactionHandlers = EditorView.domEventHandlers({
       );
       if (!handled) {
         const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
-        if (pos != null && ctrlNavAtPos(view, pos)) {
+        if (pos != null && ctrlNavAt(view, pos)) {
           event.preventDefault();
           return true;
         }

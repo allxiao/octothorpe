@@ -1,5 +1,7 @@
 import { EditorView } from "@codemirror/view";
 import { syntaxTree } from "@codemirror/language";
+import type { SyntaxNode } from "@lezer/common";
+import { resolveLinkRef } from "./linkRefs";
 import { openUrl } from "../../ipc/commands";
 
 /** Open a URL with the OS default handler (falls back to a tab in the browser). */
@@ -101,6 +103,57 @@ export function followRenderedLink(view: EditorView, link: Element): boolean {
   const missing = link.getAttribute("data-missing");
   if (missing != null) {
     createOrGotoDef(view, missing);
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Follow a Markdown link *node*: open a URL, jump to a `#anchor`, or (for a
+ * reference link) open the resolved definition / scaffold a missing one. The link
+ * text and reference resolution are read from `view` (its state), but navigation
+ * actions run against `navView` — the same view by default, or the *main* editor
+ * when following a link inside a table cell (headings/definitions live there, not
+ * in the cell's tiny document). Returns whether it navigated.
+ */
+export function followLink(
+  view: EditorView,
+  node: SyntaxNode,
+  navView: EditorView = view,
+): boolean {
+  const state = view.state;
+  const slice = (a: number, b: number) => state.doc.sliceString(a, b);
+  const open = (dest: string) => {
+    const url = dest.replace(/^<([\s\S]*)>$/, "$1").trim();
+    if (!url) return false;
+    if (url.startsWith("#")) jumpToAnchor(navView, url.slice(1));
+    else openExternal(url);
+    return true;
+  };
+
+  // Inline link with a parsed URL destination (`[text](url)`, `[text](<url>)`).
+  const urlNode = node.getChild("URL");
+  if (urlNode) return open(slice(urlNode.from, urlNode.to));
+
+  const marks = node.getChildren("LinkMark");
+  // Lenient inline form: `[text](destination)` whose URL may contain spaces.
+  const lineTo = state.doc.lineAt(node.to).to;
+  const lenient = marks.length === 2 ? /^\(\s*([^)]+?)\s*\)/.exec(slice(node.to, lineTo)) : null;
+  if (lenient) {
+    let dest = lenient[1];
+    const tm = /^([\s\S]*?)\s+"([^"]*)"$/.exec(dest); // strip an optional trailing title
+    if (tm) dest = tm[1];
+    return open(dest);
+  }
+
+  // Reference link `[text][id]` / `[text][]`: open the resolved definition, or
+  // scaffold one when it's missing (mirrors the rendered `data-missing` path).
+  const ref = /^\[([^\]]*)\]\[([^\]]*)\]$/.exec(slice(node.from, node.to));
+  if (ref) {
+    const label = ref[2].trim() ? ref[2] : ref[1];
+    const resolved = resolveLinkRef(state, label);
+    if (resolved) return open(resolved.url);
+    createOrGotoDef(navView, label);
     return true;
   }
   return false;

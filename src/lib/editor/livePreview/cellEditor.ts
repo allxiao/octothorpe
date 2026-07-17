@@ -18,6 +18,7 @@ import {
 } from "./config";
 import { linkRefsOverride, type LinkRef } from "./linkRefs";
 import { type Footnote } from "./footnotes";
+import { ctrlNavAt, modClickCursor } from "./modNav";
 
 /**
  * A tiny, single-line CodeMirror editor mounted inside a focused table cell. It
@@ -120,6 +121,7 @@ export function mountCellEditor(
   source: string,
   opts: CellEditorOpts,
   handlers: CellEditorHandlers,
+  mainView: EditorView,
 ): EditorView {
   const cellKeymap = Prec.highest(
     keymap.of([
@@ -145,6 +147,21 @@ export function mountCellEditor(
       syntaxHighlighting(defaultHighlightStyle),
       markdownLang(),
       livePreviewPlugin,
+      modClickCursor,
+      // Ctrl/Cmd+click a link or footnote reference in the cell follows it in the
+      // *main* document (the cell's own tiny doc has no headings/definitions).
+      EditorView.domEventHandlers({
+        mousedown(event, cellView) {
+          if (!(event.ctrlKey || event.metaKey)) return false;
+          const pos = cellView.posAtCoords({ x: event.clientX, y: event.clientY });
+          if (pos == null) return false;
+          if (ctrlNavAt(cellView, pos, mainView)) {
+            event.preventDefault();
+            return true;
+          }
+          return false;
+        },
+      }),
       inlineOnly.of(true),
       imageBaseDir.of(opts.baseDir),
       linkRefsOverride.of(opts.linkRefs),
