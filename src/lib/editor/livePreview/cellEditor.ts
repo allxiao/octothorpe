@@ -17,6 +17,7 @@ import {
   revealSimpleSource,
 } from "./config";
 import { linkRefsOverride, type LinkRef } from "./linkRefs";
+import { type Footnote } from "./footnotes";
 
 /**
  * A tiny, single-line CodeMirror editor mounted inside a focused table cell. It
@@ -35,6 +36,10 @@ export interface CellEditorOpts {
   /** The main document's link reference definitions, so `[text][id]` in the cell
    *  resolves against the whole document rather than the cell's own (empty) doc. */
   linkRefs: Map<string, LinkRef>;
+  /** Present so the shared cell options object also satisfies the idle-cell
+   *  renderer (see cellRender); the live cell editor keeps footnote source literal
+   *  and doesn't use it. */
+  footnotes?: Map<string, Footnote>;
 }
 
 /** Callbacks the cell editor invokes; the TableWidget owns cell geometry. */

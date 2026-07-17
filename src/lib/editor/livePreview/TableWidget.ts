@@ -17,8 +17,9 @@ import {
 } from "../commands/table";
 import { renderCellMarkdown, type CellRenderOpts } from "./cellRender";
 import { mountCellEditor, type CellEditorHandlers, type CellEditorOpts } from "./cellEditor";
-import { imageBaseDir, inlineMathDisplayStyle } from "./config";
+import { imageBaseDir, inlineMathDisplayStyle, renderFootnotes } from "./config";
 import { linkRefsField } from "./linkRefs";
+import { footnotesField } from "./footnotes";
 
 /** Structural / alignment operations a table can perform. */
 export type TableOp =
@@ -206,6 +207,11 @@ export class TableWidget extends WidgetType {
       baseDir: view.state.facet(imageBaseDir),
       displaystyle: view.state.facet(inlineMathDisplayStyle),
       linkRefs: view.state.field(linkRefsField, false) ?? new Map(),
+      // Footnote defs so `[^label]` cells render as pills; undefined (→ literal)
+      // when footnote rendering is disabled.
+      footnotes: view.state.facet(renderFootnotes)
+        ? (view.state.field(footnotesField, false) ?? new Map())
+        : undefined,
     };
 
     const wrap = document.createElement("div");

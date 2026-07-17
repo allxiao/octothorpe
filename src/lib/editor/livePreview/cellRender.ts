@@ -6,6 +6,7 @@ import { emojiFor } from "../emoji";
 import { resolveHtmlSrc } from "../html/paths";
 import { sanitizeHtml } from "../html/render";
 import { normalizeLabel, type LinkRef } from "./linkRefs";
+import { normalizeFootnote, type Footnote } from "./footnotes";
 
 /**
  * Render a table cell's Markdown *source* to inline HTML — the same inline
@@ -34,6 +35,10 @@ export interface CellRenderOpts {
   /** The document's link reference definitions, so `[text][id]` in a cell resolves
    *  against the whole document (the cell has none of its own). */
   linkRefs?: Map<string, LinkRef>;
+  /** The document's footnote definitions, so `[^label]` in a cell resolves against
+   *  the whole document. Undefined when footnote rendering is off — then a
+   *  reference stays literal source text. */
+  footnotes?: Map<string, Footnote>;
 }
 
 function escapeHtml(s: string): string {
@@ -115,6 +120,19 @@ function renderNode(node: SyntaxNode, src: string, opts: CellRenderOpts): string
       return glyph
         ? `<span class="cm-md-emoji">${escapeHtml(glyph)}</span>`
         : escapeHtml(src.slice(node.from, node.to));
+    }
+    case "FootnoteReference": {
+      const label = src.slice(node.from + 2, node.to - 1);
+      // Off (no map) → literal; the `[^label]:` definition marker at the cell start
+      // is literal too, not a reference. Otherwise render the same superscript pill
+      // as the body, with the definition text in the native title.
+      if (!opts.footnotes || (src[node.to] === ":" && src.slice(0, node.from).trim() === "")) {
+        return escapeHtml(src.slice(node.from, node.to));
+      }
+      const def = opts.footnotes.get(normalizeFootnote(label));
+      const cls = def ? "cm-md-footnote-ref" : "cm-md-footnote-ref cm-md-footnote-ref-missing";
+      const title = def && def.content.trim() ? ` title="${escapeHtml(def.content)}"` : "";
+      return `<sup class="${cls}" data-label="${escapeHtml(label)}"${title}>${escapeHtml(label)}</sup>`;
     }
     case "Link": {
       const marks = node.getChildren("LinkMark");
