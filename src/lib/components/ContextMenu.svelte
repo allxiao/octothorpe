@@ -21,6 +21,8 @@
     checked?: boolean;
     disabled?: boolean;
     submenu?: LabelItem[];
+    /** Render as a separator line instead of a clickable row. */
+    sep?: boolean;
   }
   type Row =
     | { kind: "icons"; icons: IconBtn[]; ni: number }
@@ -139,6 +141,7 @@
     const out: LabelItem[] = [];
     for (let n = 1; n <= 6; n++)
       out.push({ label: `Heading ${n}`, key: `Ctrl+${n}`, checked: h === n, act: pc(`heading${n}`) });
+    out.push({ label: "", sep: true });
     out.push({ label: "Paragraph", key: "Ctrl+0", checked: h === 0, act: pc("paragraph") });
     return out;
   }
@@ -249,7 +252,7 @@
     let idx = from;
     for (let step = 0; step < n; step++) {
       idx = (idx + dir + n) % n;
-      if (!items[idx].disabled) return idx;
+      if (!items[idx].disabled && !items[idx].sep) return idx;
     }
     return from;
   }
@@ -412,19 +415,23 @@
           {#if row.item.submenu && openSub === row.ni}
             <div class="ctx-menu ctx-submenu" class:flip={subFlip} role="menu">
               {#each row.item.submenu as si, sidx}
-                <button
-                  type="button"
-                  class="ctx-item"
-                  class:focused={subActive === sidx}
-                  role="menuitem"
-                  disabled={si.disabled}
-                  onmouseenter={() => (subActive = sidx)}
-                  onclick={() => run(si.act)}
-                >
-                  <span class="ctx-check">{si.checked ? "✓" : ""}</span>
-                  <span class="ctx-lbl">{si.label}</span>
-                  {#if si.key}<span class="ctx-key">{si.key}</span>{/if}
-                </button>
+                {#if si.sep}
+                  <div class="ctx-sep"></div>
+                {:else}
+                  <button
+                    type="button"
+                    class="ctx-item"
+                    class:focused={subActive === sidx}
+                    role="menuitem"
+                    disabled={si.disabled}
+                    onmouseenter={() => (subActive = sidx)}
+                    onclick={() => run(si.act)}
+                  >
+                    <span class="ctx-check">{si.checked ? "✓" : ""}</span>
+                    <span class="ctx-lbl">{si.label}</span>
+                    {#if si.key}<span class="ctx-key">{si.key}</span>{/if}
+                  </button>
+                {/if}
               {/each}
             </div>
           {/if}
