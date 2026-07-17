@@ -18,7 +18,8 @@ import { mathRendererEffect } from "../math/render";
 import { htmlBlockField } from "./htmlBlockField";
 import { inlineMathTooltipField } from "./mathTooltip";
 import { linkRefsField, resolveLinkRef } from "./linkRefs";
-import { footnotesField, firstFootnoteReferencePos, gotoOrCreateFootnote, isFootnoteDefMarker } from "./footnotes";
+import { footnotesField, firstFootnoteReferencePos, gotoOrCreateFootnote } from "./footnotes";
+import { navTargetAtPos, modClickCursor } from "./modNav";
 import { clearActiveTable, tableWidthField } from "./TableWidget";
 import { openUrl } from "../../ipc/commands";
 
@@ -155,28 +156,16 @@ function followLink(view: EditorView, node: SyntaxNode): boolean {
  * whether it navigated.
  */
 function ctrlNavAtPos(view: EditorView, pos: number): boolean {
-  const state = view.state;
-  let acted = false;
-  syntaxTree(state).iterate({
-    from: pos,
-    to: pos,
-    enter: (node) => {
-      if (acted) return false;
-      if (node.name === "FootnoteReference") {
-        if (!isFootnoteDefMarker(state, node.from, node.to)) {
-          gotoOrCreateFootnote(view, state.doc.sliceString(node.from + 2, node.to - 1));
-          acted = true;
-        }
-        return false;
-      }
-      if (node.name === "Link") {
-        acted = followLink(view, node.node);
-        return false;
-      }
-      return undefined;
-    },
-  });
-  return acted;
+  const t = navTargetAtPos(view.state, pos);
+  if (!t) return false;
+  if (t.kind === "link" && t.node) return followLink(view, t.node);
+  if (t.kind === "footnote" && t.label != null) {
+    gotoOrCreateFootnote(view, t.label);
+    return true;
+  }
+  // A footnote definition marker is handled by its own `.cm-md-footnote-def`
+  // decoration handler (jump to first reference), so ignore it here.
+  return false;
 }
 
 /**
@@ -377,6 +366,9 @@ export const livePreviewTheme = EditorView.theme({
   ".cm-md-footnote-ref-missing:hover": { background: "rgba(245, 158, 11, 0.28)" },
   // Definition marker `[^label]:` — dimmed so the content reads as the note body.
   ".cm-md-footnote-def": { opacity: "0.5" },
+  // Ctrl/Cmd+hover affordance: the link/footnote token under the pointer shows a
+  // hand, signalling a click will navigate — even over revealed raw source.
+  ".cm-md-modclick, .cm-md-modclick *": { cursor: "pointer" },
   // Rendered inline HTML tags (Typora-style). Kept inline-editable via mark
   // decorations; the tag markers are hidden while the caret is outside.
   ".cm-html-kbd": {
@@ -969,5 +961,6 @@ export function livePreview(): Extension {
     interactionHandlers,
     linkStatusPlugin,
     mermaidThemePlugin,
+    modClickCursor,
   ];
 }
