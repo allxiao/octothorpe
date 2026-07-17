@@ -149,6 +149,7 @@
   function docInsertSubmenu(): LabelItem[] {
     return [
       { label: "Image", key: "Ctrl+Shift+I", act: () => workspace.insertImageFromPicker() },
+      { label: "", sep: true },
       { label: "Footnotes", act: pc("footnote") },
       { label: "Link Reference", act: pc("linkReference") },
       { label: "Horizontal Line", act: pc("horizontalRule") },
@@ -157,6 +158,7 @@
       { label: "Math Block", key: "Ctrl+Shift+M", act: pc("mathBlock") },
       { label: "Table of Contents", act: pc("tableOfContents") },
       { label: "YAML Front Matter", act: pc("yamlFrontMatter") },
+      { label: "", sep: true },
       { label: "Paragraph (before)", act: pc("insertParagraphBefore") },
       { label: "Paragraph (after)", act: pc("insertParagraphAfter") },
     ];
@@ -165,6 +167,7 @@
   function tableInsertSubmenu(): LabelItem[] {
     return [
       { label: "Image", key: "Ctrl+Shift+I", act: () => workspace.tableInsertImage() },
+      { label: "", sep: true },
       { label: "Paragraph (before)", act: () => workspace.tableInsertParagraph("before") },
       { label: "Paragraph (after)", act: () => workspace.tableInsertParagraph("after") },
     ];
