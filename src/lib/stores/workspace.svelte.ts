@@ -10,6 +10,7 @@ import {
   getActiveTable,
   runActiveTableCommand,
   runActiveTableOp,
+  runActiveTableParagraph,
 } from "../editor/livePreview/TableWidget";
 
 export type ViewId = "explorer" | "tags" | "outline" | "search";
@@ -38,6 +39,10 @@ export interface EditorApi {
   tableText: () => string | null;
   codeText: () => string | null;
   insertTable: (cols: number, rows: number) => void;
+  /** Delete the current selection (no-op when empty). */
+  deleteSelection: () => void;
+  /** Move the caret to an absolute document position. */
+  setSelection: (pos: number) => void;
 }
 
 export type PageWidth = "normal" | "wide" | "full";
@@ -253,6 +258,11 @@ class Workspace {
     this.#editor?.gotoLine(line);
   }
 
+  /** Return keyboard focus to the editor (e.g. after dismissing a menu). */
+  focusEditor() {
+    this.#editor?.focus();
+  }
+
   // --- edit menu -----------------------------------------------------------
 
   editUndo() {
@@ -301,6 +311,22 @@ class Workspace {
       if (text) this.#editor?.paste(text);
     } catch (e) {
       this.status = `Paste failed: ${e}`;
+    }
+  }
+
+  /** Delete the current selection (context-menu Delete). No-op when empty. */
+  deleteSelection() {
+    this.#editor?.deleteSelection();
+  }
+
+  /** Open the OS browser with a web search for the given text (context menu). */
+  async searchWeb(query: string) {
+    const q = query.trim();
+    if (!q) return;
+    try {
+      await ipc.openUrl(`https://www.google.com/search?q=${encodeURIComponent(q)}`);
+    } catch (e) {
+      this.status = `Search failed: ${e}`;
     }
   }
 
@@ -421,6 +447,30 @@ class Workspace {
    *  table, falling back to the caret-based command for raw tables. */
   tableCommand(id: string) {
     if (!runActiveTableCommand(id)) this.#editor?.runCommand(id);
+  }
+
+  /** Insert an empty paragraph before/after the active rendered table (table-cell
+   *  context menu → Insert → Paragraph before/after). */
+  tableInsertParagraph(where: "before" | "after") {
+    runActiveTableParagraph(where);
+  }
+
+  /** Insert an image after the active rendered table (table-cell context menu →
+   *  Insert → Image): drop out onto a fresh line below the table, then pick. */
+  async tableInsertImage() {
+    if (runActiveTableParagraph("after")) await this.insertImageFromPicker();
+  }
+
+  /** Prompt for an image file and insert it at the cursor (context-menu Insert →
+   *  Image). Reuses the drag-drop image pipeline (copy-into-folder, relative
+   *  paths, preferred syntax). */
+  async insertImageFromPicker() {
+    try {
+      const path = await ipc.pickImagePath();
+      if (path) await this.insertImage(path);
+    } catch (e) {
+      this.status = `Insert image failed: ${e}`;
+    }
   }
 
   // --- insert-table dialog -------------------------------------------------

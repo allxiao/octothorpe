@@ -21,6 +21,7 @@ import { imageBaseDir, inlineMathDisplayStyle, renderFootnotes } from "./config"
 import { linkRefsField } from "./linkRefs";
 import { footnotesField, gotoOrCreateFootnote } from "./footnotes";
 import { followRenderedLink } from "./linkNav";
+import { contextMenu } from "../../stores/contextMenu.svelte";
 
 /** Structural / alignment operations a table can perform. */
 export type TableOp =
@@ -45,7 +46,13 @@ export type TableOp =
 // The most recently focused table, so the Paragraph → Table menu (which blurs
 // the cell when it opens) can still target it. Cleared when the caret lands in
 // normal editor text (see the focusin handler in index.ts).
-let activeTable: { from: number; run: (op: TableOp) => void } | null = null;
+interface ActiveTable {
+  from: number;
+  run: (op: TableOp) => void;
+  /** Insert an empty paragraph before/after the whole table (context menu). */
+  paragraphAround: (where: "before" | "after") => void;
+}
+let activeTable: ActiveTable | null = null;
 export const getActiveTable = () => activeTable;
 export function clearActiveTable() {
   activeTable = null;
@@ -53,6 +60,12 @@ export function clearActiveTable() {
 export function runActiveTableOp(op: TableOp): boolean {
   if (!activeTable) return false;
   activeTable.run(op);
+  return true;
+}
+/** Insert an empty paragraph before/after the active rendered table. */
+export function runActiveTableParagraph(where: "before" | "after"): boolean {
+  if (!activeTable) return false;
+  activeTable.paragraphAround(where);
   return true;
 }
 /** Map a Paragraph-menu command id to a table op and run it on the active table. */
@@ -405,7 +418,7 @@ export class TableWidget extends WidgetType {
       const tr = cell.parentElement as HTMLElement;
       activeCol = [...tr.children].indexOf(cell);
       activeRow = (tr.parentElement as HTMLElement).tagName === "THEAD" ? -1 : bodyRowEls().indexOf(tr);
-      activeTable = { from: self.from, run: doOp };
+      activeTable = { from: self.from, run: doOp, paragraphAround: insertParagraphAround };
       menu.style.display = "none";
       const src = cell.dataset.src ?? "";
       cell.innerHTML = "";
@@ -458,6 +471,22 @@ export class TableWidget extends WidgetType {
         view.dispatch({ selection: { anchor: view.state.doc.line(endLine.number + 1).from }, scrollIntoView: true });
       } else {
         view.dispatch({ changes: { from: endLine.to, insert: "\n" }, selection: { anchor: endLine.to + 1 }, scrollIntoView: true });
+      }
+    };
+    // Commit the table and open an empty paragraph line immediately before/after
+    // it, placing the caret there (context menu → Insert → Paragraph before/after).
+    const insertParagraphAround = (where: "before" | "after") => {
+      navigating = true;
+      teardownActive();
+      navigating = false;
+      self.commit(view, wrap);
+      view.focus();
+      const { from, to } = self.range(view);
+      if (where === "before") {
+        view.dispatch({ changes: { from, insert: "\n" }, selection: { anchor: from }, scrollIntoView: true });
+      } else {
+        const end = Math.min(to, view.state.doc.length);
+        view.dispatch({ changes: { from: end, insert: "\n" }, selection: { anchor: end + 1 }, scrollIntoView: true });
       }
     };
     const moveLinear = (dir: number, caret: "start" | "end" = dir > 0 ? "start" : "end") => {
@@ -536,6 +565,23 @@ export class TableWidget extends WidgetType {
       if (to && wrap.contains(to)) return;
       if (activeEditor) { navigating = true; teardownActive(); navigating = false; }
       this.commit(view, wrap);
+    });
+    // Right-click a cell → point the active-table bridge at it, then open the
+    // shared context menu in table-cell scope. stopPropagation keeps the main
+    // editor's own contextmenu handler from also firing.
+    wrap.addEventListener("contextmenu", (e) => {
+      const cell = (e.target as HTMLElement).closest?.("th,td") as HTMLElement | null;
+      if (!cell || !wrap.contains(cell)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (activeCellEl !== cell) mountInCell(cell, { x: e.clientX, y: e.clientY });
+      contextMenu.openAt(e.clientX, e.clientY, {
+        scope: "tableCell",
+        block: null,
+        inline: null,
+        isListItem: false,
+        selectedText: "",
+      });
     });
 
     return wrap;

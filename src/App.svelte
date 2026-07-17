@@ -12,6 +12,7 @@
   import EditorHost from "./lib/editor/EditorHost.svelte";
   import InsertTableModal from "./lib/components/InsertTableModal.svelte";
   import PreferencesModal from "./lib/components/PreferencesModal.svelte";
+  import ContextMenu from "./lib/components/ContextMenu.svelte";
 
   let unlistenDrop: (() => void) | null = null;
 
@@ -202,6 +203,8 @@
     <div class="drop-hint">Drop files to open or insert</div>
   </div>
 {/if}
+
+<ContextMenu />
 
 <style>
   .app {

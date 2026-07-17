@@ -11,6 +11,9 @@ import type {
 } from "./types";
 
 const MD_FILTERS = [{ name: "Markdown", extensions: ["md", "markdown", "txt"] }];
+const IMAGE_FILTERS = [
+  { name: "Images", extensions: ["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "avif"] },
+];
 
 // --- Vault & document management -----------------------------------------
 
@@ -96,6 +99,12 @@ export async function closeWindow(): Promise<void> {
 /** Prompt for a markdown file to open. Returns its path, or null if cancelled. */
 export async function pickMarkdownPath(): Promise<string | null> {
   const selected = await open({ multiple: false, directory: false, filters: MD_FILTERS });
+  return typeof selected === "string" ? selected : null;
+}
+
+/** Prompt for an image file to insert. Returns its path, or null if cancelled. */
+export async function pickImagePath(): Promise<string | null> {
+  const selected = await open({ multiple: false, directory: false, filters: IMAGE_FILTERS });
   return typeof selected === "string" ? selected : null;
 }
 

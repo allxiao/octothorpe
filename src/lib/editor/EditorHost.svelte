@@ -23,6 +23,7 @@
   } from "./commands";
   import { focusTableCell } from "./commands/table";
   import type { EditorApi } from "../stores/workspace.svelte";
+  import { contextMenu } from "../stores/contextMenu.svelte";
   import { preferences } from "../preferences/store.svelte";
 
   let {
@@ -197,6 +198,21 @@
     view.focus();
   }
 
+  /** Delete the current selection (context-menu Delete). No-op when empty. */
+  function deleteSelection() {
+    if (!view) return;
+    if (view.state.selection.main.empty) return;
+    view.dispatch(view.state.replaceSelection(""));
+    view.focus();
+  }
+
+  /** Move the caret to an absolute document position (clamped). */
+  function setSelection(pos: number) {
+    if (!view) return;
+    const anchor = Math.max(0, Math.min(pos, view.state.doc.length));
+    view.dispatch({ selection: { anchor }, scrollIntoView: true });
+  }
+
   /** Selected text, or the whole document if nothing is selected (for "Copy as…"). */
   function selectionOrDoc(): string {
     if (!view) return "";
@@ -307,6 +323,36 @@
             event.clipboardData?.setData("text/plain", "");
             return true;
           },
+          // Right-click → context-aware menu. Move the caret (or select the word
+          // under the cursor when nothing is selected) BEFORE snapshotting block/
+          // inline state, since those read from the current selection.
+          contextmenu: (event, v) => {
+            event.preventDefault(); // suppress the native/WebView menu over the editor
+            const pos = v.posAtCoords({ x: event.clientX, y: event.clientY });
+            if (pos == null) return true;
+            const sel = v.state.selection.main;
+            const insideSel = !sel.empty && pos >= sel.from && pos <= sel.to;
+            if (!insideSel) {
+              const word = v.state.wordAt(pos);
+              v.dispatch(
+                word
+                  ? { selection: { anchor: word.from, head: word.to } }
+                  : { selection: { anchor: pos } },
+              );
+            }
+            const block = computeBlockState(v.state);
+            const inline = computeInlineState(v.state);
+            const s = v.state.selection.main;
+            const selectedText = v.state.sliceDoc(s.from, s.to);
+            contextMenu.openAt(event.clientX, event.clientY, {
+              scope: "doc",
+              block,
+              inline,
+              isListItem: !!block && (block.bulletList || block.orderedList || block.taskList),
+              selectedText,
+            });
+            return true;
+          },
         }),
         baseDirComp.of(imageBaseDir.of(baseDir)),
         onTagClick.of((tag) => ontagclick?.(tag)),
@@ -337,6 +383,8 @@
       tableText: () => (view ? computeTableText(view.state) : null),
       codeText: () => (view ? computeCodeText(view.state) : null),
       insertTable,
+      deleteSelection,
+      setSelection,
     });
     // Dev-only hook so the live preview can be driven/inspected in a browser.
     if (import.meta.env.DEV) {
