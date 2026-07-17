@@ -19,7 +19,7 @@ import { renderCellMarkdown, type CellRenderOpts } from "./cellRender";
 import { mountCellEditor, type CellEditorHandlers, type CellEditorOpts } from "./cellEditor";
 import { imageBaseDir, inlineMathDisplayStyle, renderFootnotes } from "./config";
 import { linkRefsField } from "./linkRefs";
-import { footnotesField } from "./footnotes";
+import { footnotesField, gotoOrCreateFootnote } from "./footnotes";
 
 /** Structural / alignment operations a table can perform. */
 export type TableOp =
@@ -487,7 +487,20 @@ export class TableWidget extends WidgetType {
 
     // Click a cell → mount its editor at the click position.
     wrap.addEventListener("mousedown", (e) => {
-      const cell = (e.target as HTMLElement).closest?.("th,td") as HTMLElement | null;
+      const target = e.target as HTMLElement;
+      // Ctrl/Cmd + click a footnote reference pill navigates in the *main*
+      // document (jump to / create the definition) rather than entering cell-edit
+      // mode — the cell's own tiny doc has no footnote definitions.
+      const fnRef = target.closest?.(".cm-md-footnote-ref") as HTMLElement | null;
+      if (fnRef && (e.ctrlKey || e.metaKey)) {
+        const label = fnRef.getAttribute("data-label");
+        if (label) {
+          e.preventDefault();
+          gotoOrCreateFootnote(view, label);
+          return;
+        }
+      }
+      const cell = target.closest?.("th,td") as HTMLElement | null;
       if (!cell || !wrap.contains(cell)) return;
       if (activeCellEl === cell && activeEditor) return; // already editing → native click
       e.preventDefault();
