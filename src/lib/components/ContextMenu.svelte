@@ -197,6 +197,9 @@
   let px = $state(0);
   let py = $state(0);
   let subFlip = $state(false);
+  // Vertical offset (px) of the open submenu relative to its anchor, so a tall
+  // submenu near the bottom edge shifts up to stay in the viewport.
+  let subTop = $state(-5);
 
   // Keyboard/hover focus: `active` = nav index of the focused row, `activeCol` =
   // button index within an icon row, `openSub` = nav index whose submenu is open,
@@ -232,6 +235,27 @@
         py = Math.max(pad, window.innerHeight - r.height - pad);
       // Flip submenus to the left when the menu sits near the right edge.
       subFlip = px + r.width + 220 > window.innerWidth - pad;
+    });
+  });
+
+  // Vertically clamp the open submenu so it stays within the viewport (a tall
+  // submenu opened near the bottom edge shifts up instead of being cropped).
+  $effect(() => {
+    if (openSub < 0) {
+      subTop = -5;
+      return;
+    }
+    void tick().then(() => {
+      const sub = menuEl?.querySelector(".ctx-submenu") as HTMLElement | null;
+      const anchor = sub?.parentElement;
+      if (!sub || !anchor) return;
+      const arect = anchor.getBoundingClientRect();
+      const h = sub.getBoundingClientRect().height;
+      const pad = 8;
+      let vtop = arect.top - 5; // default viewport top (matches CSS top: -5px)
+      if (vtop + h > window.innerHeight - pad) vtop = window.innerHeight - pad - h;
+      if (vtop < pad) vtop = pad;
+      subTop = vtop - arect.top;
     });
   });
 
@@ -413,7 +437,7 @@
             {#if row.item.submenu}<span class="ctx-arrow">›</span>{/if}
           </button>
           {#if row.item.submenu && openSub === row.ni}
-            <div class="ctx-menu ctx-submenu" class:flip={subFlip} role="menu">
+            <div class="ctx-menu ctx-submenu" class:flip={subFlip} role="menu" style="top: {subTop}px;">
               {#each row.item.submenu as si, sidx}
                 {#if si.sep}
                   <div class="ctx-sep"></div>
