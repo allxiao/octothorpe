@@ -5,9 +5,9 @@ import { gotoOrCreateFootnote } from "./footnotes";
  * A footnote reference (`[^label]`) rendered as a superscript pill. Plain click
  * drops the caret at the reference so `isElementActive` reveals the raw source
  * for editing (like the emoji/link widgets); Ctrl/Cmd+click jumps to the
- * definition (creating an empty one if it's missing). The definition's text (when
- * present) rides in the native `title`, so hovering shows a built-in tooltip like
- * a link title; references without a definition carry a `missing` class instead.
+ * definition (creating an empty one if it's missing). Hovering shows the
+ * definition rendered as Markdown (see footnoteTooltip.ts); references without a
+ * definition carry a `missing` class instead.
  */
 export class FootnoteRefWidget extends WidgetType {
   constructor(
@@ -26,8 +26,6 @@ export class FootnoteRefWidget extends WidgetType {
     sup.className = "cm-md-footnote-ref" + (this.content === null ? " cm-md-footnote-ref-missing" : "");
     sup.textContent = this.label;
     sup.setAttribute("data-label", this.label);
-    // Native tooltip shows the footnote text, mirroring a link's title.
-    if (this.content && this.content.trim()) sup.title = this.content;
     sup.addEventListener("mousedown", (e) => {
       e.preventDefault();
       if (e.ctrlKey || e.metaKey) {

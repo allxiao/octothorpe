@@ -125,14 +125,13 @@ function renderNode(node: SyntaxNode, src: string, opts: CellRenderOpts): string
       const label = src.slice(node.from + 2, node.to - 1);
       // Off (no map) → literal; the `[^label]:` definition marker at the cell start
       // is literal too, not a reference. Otherwise render the same superscript pill
-      // as the body, with the definition text in the native title.
+      // as the body; hovering renders the definition (see footnoteTooltip.ts).
       if (!opts.footnotes || (src[node.to] === ":" && src.slice(0, node.from).trim() === "")) {
         return escapeHtml(src.slice(node.from, node.to));
       }
       const def = opts.footnotes.get(normalizeFootnote(label));
       const cls = def ? "cm-md-footnote-ref" : "cm-md-footnote-ref cm-md-footnote-ref-missing";
-      const title = def && def.content.trim() ? ` title="${escapeHtml(def.content)}"` : "";
-      return `<sup class="${cls}" data-label="${escapeHtml(label)}"${title}>${escapeHtml(label)}</sup>`;
+      return `<sup class="${cls}" data-label="${escapeHtml(label)}">${escapeHtml(label)}</sup>`;
     }
     case "Link": {
       const marks = node.getChildren("LinkMark");

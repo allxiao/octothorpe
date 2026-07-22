@@ -15,6 +15,7 @@ import { clearMermaidCache, mermaidReadyEffect } from "../mermaid/render";
 import { mathRendererEffect } from "../math/render";
 import { htmlBlockField } from "./htmlBlockField";
 import { inlineMathTooltipField } from "./mathTooltip";
+import { footnoteTooltip } from "./footnoteTooltip";
 import { linkRefsField } from "./linkRefs";
 import { footnotesField, firstFootnoteReferencePos } from "./footnotes";
 import { modClickCursor, ctrlNavAt } from "./modNav";
@@ -219,6 +220,23 @@ export const livePreviewTheme = EditorView.theme({
   ".cm-md-footnote-ref-missing:hover": { background: "rgba(245, 158, 11, 0.28)" },
   // Definition marker `[^label]:` — dimmed so the content reads as the note body.
   ".cm-md-footnote-def": { opacity: "0.5" },
+  // Hover tooltip for a footnote reference: the definition rendered as Markdown.
+  ".cm-md-footnote-tooltip": {
+    position: "fixed",
+    zIndex: "50",
+    maxWidth: "min(30em, 90vw)",
+    minWidth: "2em",
+    padding: "6px 10px",
+    borderRadius: "6px",
+    border: "1px solid var(--border, #ddd)",
+    background: "var(--menu-bg, var(--button-bg, #fff))",
+    color: "var(--text, #333)",
+    boxShadow: "0 4px 14px rgba(0, 0, 0, 0.18)",
+    fontSize: "0.85em",
+    lineHeight: "1.45",
+    pointerEvents: "none",
+    overflowWrap: "anywhere",
+  },
   // Ctrl/Cmd+hover affordance: the link/footnote token under the pointer shows a
   // hand, signalling a click will navigate — even over revealed raw source.
   ".cm-md-modclick, .cm-md-modclick *": { cursor: "pointer" },
@@ -797,6 +815,7 @@ export function livePreview(): Extension {
     mermaidField,
     htmlBlockField,
     inlineMathTooltipField,
+    footnoteTooltip,
     livePreviewPlugin,
     tableWidthField,
     livePreviewTheme,
